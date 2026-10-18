@@ -534,7 +534,7 @@ Recommended checks:
 
 ## SSL/HTTPS
 
-Per [ADR-002](https://github.com/canergunay/proxima), the standard approach for SSL is **Nginx Proxy Manager (NPM)**, deployed as a separate service outside Proxima's docker-compose.
+Per [ADR-002](https://github.com/erghold/proxima), the standard approach for SSL is **Nginx Proxy Manager (NPM)**, deployed as a separate service outside Proxima's docker-compose.
 
 ### Why NPM
 

@@ -9,7 +9,7 @@ This guide covers installing Proxima on a fresh Linux server, running the initia
 Run the guided installer on your Linux server as root:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/canergunay/proxima/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/erghold/proxima/main/install.sh | sudo bash
 ```
 
 The installer will:
@@ -131,7 +131,7 @@ sudo systemctl restart docker
 ```bash
 # Clone the repository
 cd /opt
-sudo git clone https://github.com/canergunay/proxima.git
+sudo git clone https://github.com/erghold/proxima.git
 cd proxima
 
 # Create the Docker network

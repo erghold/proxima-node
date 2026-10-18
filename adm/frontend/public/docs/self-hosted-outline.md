@@ -20,7 +20,7 @@ Proxima's backend fetches the ssconf JSON to configure its Outline client contai
 SSH into the VPS as root and run:
 
 ```bash
-bash <(curl -sL https://raw.githubusercontent.com/canergunay/proxima/main/scripts/setup-outline-ss.sh)
+bash <(curl -sL https://raw.githubusercontent.com/erghold/proxima/main/scripts/setup-outline-ss.sh)
 ```
 
 > If the script is not yet available, follow the **Manual Steps** below — the script does exactly the same thing.

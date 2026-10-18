@@ -1,6 +1,6 @@
 # Proxima Node (ADM) — startup
 
-This workspace is `canergunay/proxima-node`, the infrastructure management
+This workspace is `erghold/proxima-node`, the infrastructure management
 application, not the Proxima site server or VPN client repository.
 
 - Read `CONTINUITY.md`, then `continuity/HANDOFF.md` for current evidence and

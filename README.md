@@ -6,7 +6,7 @@ Old AI histories and sibling repositories are not startup requirements.
 [Saved conversations](continuity/sessions/INDEX.md) are kept separate from
 project state; [restore instructions](continuity/SESSIONS.md) travel with them.
 
-Infrastructure-as-Code for [Proxima](https://github.com/canergunay/proxima) server nodes — VPN exit servers and DPI bypass nodes.
+Infrastructure-as-Code for [Proxima](https://github.com/erghold/proxima) server nodes — VPN exit servers and DPI bypass nodes.
 
 Manages provisioning, configuration, credential rotation, and lifecycle of all Proxima server infrastructure via Ansible roles and playbooks.
 
@@ -25,7 +25,7 @@ See [docs/server-types.md](docs/server-types.md) for detailed comparison.
 
 ```bash
 # Clone the repo on the Ansible control machine
-git clone https://github.com/canergunay/proxima-node.git
+git clone https://github.com/erghold/proxima-node.git
 cd proxima-node
 
 # Setup host variables
@@ -43,7 +43,7 @@ ansible-playbook playbooks/setup-dpi-bypass.yml -l erg-ru --ask-pass
 
 ```bash
 # SSH into a fresh Debian 12 VPS as root:
-curl -sSL https://raw.githubusercontent.com/canergunay/proxima-node/main/setup.sh | bash
+curl -sSL https://raw.githubusercontent.com/erghold/proxima-node/main/setup.sh | bash
 ```
 
 ## Repo Structure

@@ -3,9 +3,9 @@
 # proxima-node — One-command VPN exit node setup
 #
 # Usage:
-#   curl -sSL https://raw.githubusercontent.com/canergunay/proxima-node/main/setup.sh | bash
+#   curl -sSL https://raw.githubusercontent.com/erghold/proxima-node/main/setup.sh | bash
 #   or:
-#   git clone https://github.com/canergunay/proxima-node.git && cd proxima-node && bash setup.sh
+#   git clone https://github.com/erghold/proxima-node.git && cd proxima-node && bash setup.sh
 #   or with component selection:
 #   bash setup.sh --only harden
 #
@@ -24,7 +24,7 @@
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
-REPO_URL="https://github.com/canergunay/proxima-node.git"
+REPO_URL="https://github.com/erghold/proxima-node.git"
 INSTALL_DIR="/opt/proxima-node"
 
 # Colors

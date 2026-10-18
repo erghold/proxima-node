@@ -31,7 +31,7 @@ Step-by-step checklists for deploying Proxima to a new site. Choose the mode tha
 
 ```bash
 cd /opt
-sudo git clone https://github.com/canergunay/proxima.git
+sudo git clone https://github.com/erghold/proxima.git
 cd proxima
 docker network create proxy_net
 mkdir -p config
@@ -157,7 +157,7 @@ Using Nginx Proxy Manager (NPM) per ADR-002:
 
 ```bash
 cd /opt
-sudo git clone https://github.com/canergunay/proxima.git
+sudo git clone https://github.com/erghold/proxima.git
 cd proxima
 docker network create proxy_net
 mkdir -p config
