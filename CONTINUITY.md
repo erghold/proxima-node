@@ -2,6 +2,28 @@
 
 ## Starting from a copied folder
 
+## The deploy now carries the revision that was pushed — 2026-10-21
+
+ADM ran as root while the checkout `/opt/erg/proxima-src` belonged to the user
+whose SSH key GitHub accepts, so the source refresh failed with "Could not
+read from remote repository" and the deploy continued with whatever the
+checkout held. The operation was recorded as a success. It bit twice in one
+session (2026-10-20, ADM operations 111 and 114 on SVR): both reported
+`done` and shipped the previous revision, and only the site's
+`config/version.json` said what had actually been deployed.
+
+Fixed: the git calls run as the owner of the checkout (`runuser -u <owner>`),
+so the working credentials and the ownership of the objects are the ones that
+already worked. A refresh that still fails is now written into the operation
+output instead of only into the service log, because a stale deploy is
+exactly the case the operator has to see. The deploy still continues on a
+failed refresh — a box that cannot reach GitHub should still be able to
+re-deploy what it has.
+
+Checks: 28 ADM tests pass (3 new, in `adm/backend/tests/test_source_refresh_owner.py`).
+Verified on the ADM host: a source refresh as root now reaches GitHub, and
+the checkout keeps its ownership.
+
 ## Active cosmetic web work — 2026-10-10
 
 ### Update dialog published — 2026-10-13, visual acceptance next

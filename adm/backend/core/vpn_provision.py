@@ -20,6 +20,7 @@ import requests
 
 from core.auth import encrypt_value
 from core.db import (
+    append_operation_output,
     create_operation,
     get_vpn_server,
     update_vpn_server,
@@ -124,14 +125,23 @@ def start_provision(vpn_server_id: int, admin_id: int | None = None,
     # should still be able to re-deploy what it already has. Either way the
     # revision actually being shipped is logged before the playbook starts, so
     # "what did this deploy contain" is answerable afterwards.
+    #
+    # The operation is created first, because a stale deploy is exactly the
+    # case the operator has to see: the operation otherwise reads as a plain
+    # success while carrying last week's revision.
+    op_id = create_operation(None, "provision_proxima", "setup-proxima.yml")
+
     revision, src_error = update_source()
     if src_error:
         log.warning(f"[PROVISION] {src_error} — deploying the checkout as-is")
         revision = source_revision()
+        append_operation_output(
+            op_id,
+            f"\n[ADM] The source checkout could not be refreshed: {src_error}\n"
+            f"[ADM] This deploy carries the checkout as it is"
+            f" ({revision['short'] if revision else 'unknown revision'}).\n")
     if revision:
         log.info(f"[PROVISION] Deploying {revision['short']} to {server['name']}")
-
-    op_id = create_operation(None, "provision_proxima", "setup-proxima.yml")
 
     def on_complete(success: bool, _op_id: int) -> None:
         if not success:
@@ -268,10 +278,38 @@ def _enable_singbox(vpn_server_id: int, op_id: int) -> None:
 
 # ── Version drift ────────────────────────────────────────────────────────
 
+def _git_as_checkout_owner() -> list[str]:
+    """The command prefix that runs git as the owner of the checkout.
+
+    ADM runs as root; the checkout belongs to the user whose SSH key GitHub
+    accepts. Root has no key of its own, so a fetch as root fails with
+    "Could not read from remote repository" — and the deploy then continues
+    with whatever the checkout happened to hold, which is how a site gets
+    last week's revision with the operation recorded as a success.
+
+    Running git as the owner keeps the working credentials and the working
+    ownership of the objects it writes.
+    """
+    import os
+
+    geteuid = getattr(os, "geteuid", None)
+    if geteuid is None or geteuid() != 0:
+        return []  # not root, or not a Unix host: our own credentials work
+    try:
+        import pwd
+        owner = pwd.getpwuid(os.stat(PROXIMA_SRC).st_uid).pw_name
+    except (ImportError, KeyError, OSError):
+        return []
+    if owner == "root":
+        return []
+    return ["runuser", "-u", owner, "--"]
+
+
 def source_revision() -> dict | None:
     """The revision ADM would deploy right now."""
     try:
         out = subprocess.run(
+            _git_as_checkout_owner() +
             ["git", "-C", PROXIMA_SRC, "log", "-1", "--format=%H%n%ct"],
             capture_output=True, text=True, check=True).stdout.split()
         return {"commit": out[0], "short": out[0][:7], "committed_at": int(out[1])}
@@ -281,11 +319,12 @@ def source_revision() -> dict | None:
 
 def update_source() -> tuple[dict | None, str | None]:
     """Fetch the latest source so a later deploy carries it."""
+    prefix = _git_as_checkout_owner()
     try:
-        subprocess.run(["git", "-C", PROXIMA_SRC, "fetch", "--quiet", "origin"],
+        subprocess.run(prefix + ["git", "-C", PROXIMA_SRC, "fetch", "--quiet", "origin"],
                        check=True, capture_output=True, text=True)
-        subprocess.run(["git", "-C", PROXIMA_SRC, "reset", "--quiet",
-                        "--hard", "origin/main"],
+        subprocess.run(prefix + ["git", "-C", PROXIMA_SRC, "reset", "--quiet",
+                                  "--hard", "origin/main"],
                        check=True, capture_output=True, text=True)
     except (subprocess.CalledProcessError, OSError) as e:
         detail = getattr(e, "stderr", "") or str(e)
