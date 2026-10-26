@@ -298,6 +298,7 @@
   "vpnUsers.maxPeers": "Максимум устройств",
   "vpnUsers.unlimited": "без ограничений",
   "vpnUsers.lanAccess": "Доступ к LAN",
+  "vpnUsers.allowSmartTest": "Разрешить Smart Test",
   "vpnUsers.directRoutes": "Прямые маршруты",
   "vpnUsers.profileUnhealthy": "недоступен",
   "vpnUsers.copyPackage": "Копировать",

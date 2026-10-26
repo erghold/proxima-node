@@ -335,6 +335,7 @@ export interface VpnUserAccess {
   remote_user_id: number | null;
   enabled: boolean;
   lan_access: boolean;
+  allow_smart_test: boolean;
   max_peers: number | null;
   bandwidth_quota: number | null;
   speed_download: string | null;

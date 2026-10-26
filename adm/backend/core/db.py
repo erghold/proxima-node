@@ -247,6 +247,7 @@ def init_db() -> None:
             -- May this user's devices reach that site's LAN? Per-server by
             -- nature: someone can be trusted on one site and not another.
             lan_access      INTEGER NOT NULL DEFAULT 1,
+            allow_smart_test INTEGER NOT NULL DEFAULT 0,
             sync_status     TEXT NOT NULL DEFAULT 'pending',
             sync_error      TEXT,
             synced_at       INTEGER,
@@ -311,6 +312,13 @@ def _migrate(conn: sqlite3.Connection) -> None:
         conn.execute(
             "UPDATE vpn_user_access SET password_synced_at = updated_at "
             "WHERE sync_status = 'synced'"
+        )
+        conn.commit()
+
+    if access_cols and "allow_smart_test" not in access_cols:
+        conn.execute(
+            "ALTER TABLE vpn_user_access ADD COLUMN "
+            "allow_smart_test INTEGER NOT NULL DEFAULT 0"
         )
         conn.commit()
 
@@ -1187,7 +1195,7 @@ def delete_vpn_user(user_id: int) -> bool:
 ACCESS_FIELDS = {
     "enabled", "max_peers", "bandwidth_quota",
     "speed_download", "speed_upload", "assigned_groups", "lan_access",
-    "allowed_profiles",
+    "allowed_profiles", "allow_smart_test",
 }
 
 
@@ -1257,8 +1265,8 @@ def upsert_user_access(user_id: int, vpn_server_id: int, data: dict) -> int:
     cur = conn.execute(
         "INSERT INTO vpn_user_access (user_id, vpn_server_id, remote_user_id, enabled, "
         "max_peers, bandwidth_quota, speed_download, speed_upload, assigned_groups, "
-        "allowed_profiles, lan_access, sync_status, created_at, updated_at) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)",
+        "allowed_profiles, lan_access, allow_smart_test, sync_status, created_at, updated_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)",
         (
             user_id, vpn_server_id, data.get("remote_user_id"),
             1 if data.get("enabled", True) else 0,
@@ -1266,7 +1274,9 @@ def upsert_user_access(user_id: int, vpn_server_id: int, data: dict) -> int:
             data.get("speed_download"), data.get("speed_upload"),
             data.get("assigned_groups", "[]"),
             data.get("allowed_profiles", "[]"),
-            1 if data.get("lan_access", True) else 0, ts, ts,
+            1 if data.get("lan_access", True) else 0,
+            int(type(data.get("allow_smart_test")) in (bool, int)
+                and data["allow_smart_test"] == 1), ts, ts,
         ),
     )
     conn.commit()

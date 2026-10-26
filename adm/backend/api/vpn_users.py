@@ -96,6 +96,8 @@ def _public_access(a: dict) -> dict:
         "remote_user_id": a.get("remote_user_id"),
         "enabled": bool(a["enabled"]),
         "lan_access": bool(a["lan_access"]),
+        "allow_smart_test": type(a.get("allow_smart_test")) in (bool, int)
+        and a["allow_smart_test"] == 1,
         "max_peers": a["max_peers"],
         "bandwidth_quota": a["bandwidth_quota"],
         "speed_download": a["speed_download"],
@@ -129,6 +131,11 @@ def _push_now(user_id: int) -> dict:
 def _parse_access_body(body: dict) -> tuple[dict | None, str | None]:
     """Validate the per-server limit fields. Returns (data, error)."""
     data: dict = {}
+
+    if "allow_smart_test" in body:
+        if not isinstance(body["allow_smart_test"], bool):
+            return None, "allow_smart_test must be a boolean"
+        data["allow_smart_test"] = int(body["allow_smart_test"])
 
     for flag in ("enabled", "lan_access"):
         if flag in body:

@@ -13,6 +13,7 @@ import RadioButtonUncheckedIcon from "@mui/icons-material/RadioButtonUnchecked";
 import LanIcon from "@mui/icons-material/Lan";
 import BlockIcon from "@mui/icons-material/Block";
 import AltRouteIcon from "@mui/icons-material/AltRoute";
+import ScienceIcon from "@mui/icons-material/Science";
 import ClearIcon from "@mui/icons-material/Clear";
 import { useTranslation } from "react-i18next";
 import api from "../api/client";
@@ -29,9 +30,8 @@ function cellOf(user: VpnUser, serverId: number): VpnUserAccess | undefined {
 /** Rank a cell so sorting reads top-to-bottom as "most access first". */
 function cellRank(cell: VpnUserAccess | undefined): number {
   if (!cell) return 0;
-  // Three axes, so three things to weigh. A Direct route is access like the
-  // other two and has to count, or a row with one sorts below a row without.
-  return 1 + (cell.lan_access ? 1 : 0) + (cell.allowed_profiles?.length ? 1 : 0);
+  return 1 + (cell.lan_access ? 1 : 0) + (cell.allowed_profiles?.length ? 1 : 0)
+    + (cell.allow_smart_test ? 1 : 0);
 }
 
 type SortKey = string; // "username" | "enabled" | `server:${id}`
@@ -557,6 +557,20 @@ export default function VpnUsersTab({ isSuperadmin }: { isSuperadmin: boolean })
                               {cell?.lan_access
                                 ? <LanIcon fontSize="small" color="primary" />
                                 : <BlockIcon fontSize="small" sx={{ color: cell ? "error.main" : "action.disabledBackground" }} />}
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+
+                        <Tooltip title={t("vpnUsers.allowSmartTest")}>
+                          <span>
+                            <IconButton
+                              size="small"
+                              aria-label={t("vpnUsers.allowSmartTest")}
+                              aria-pressed={cell?.allow_smart_test ?? false}
+                              disabled={!cell || busy === key}
+                              onClick={() => cell && grant(u, s, { allow_smart_test: !cell.allow_smart_test })}
+                            >
+                              <ScienceIcon fontSize="small" color={cell?.allow_smart_test ? "primary" : "disabled"} />
                             </IconButton>
                           </span>
                         </Tooltip>

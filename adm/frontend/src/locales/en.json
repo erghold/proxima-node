@@ -298,6 +298,7 @@
   "vpnUsers.maxPeers": "Max devices",
   "vpnUsers.unlimited": "unlimited",
   "vpnUsers.lanAccess": "LAN access",
+  "vpnUsers.allowSmartTest": "Allow Smart Test",
   "vpnUsers.directRoutes": "Direct routes",
   "vpnUsers.profileUnhealthy": "unavailable",
   "vpnUsers.copyPackage": "Copy",

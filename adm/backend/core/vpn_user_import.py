@@ -65,6 +65,8 @@ def _source_from_remote(fetched: dict, user: dict) -> dict:
         "remote_user_id": user["id"],
         "enabled": bool(user.get("enabled", 1)),
         "lan_access": bool(user.get("lan_access", 1)),
+        "allow_smart_test": type(user.get("allow_smart_test")) in (bool, int)
+        and user["allow_smart_test"] == 1,
         "peer_count": user.get("peer_count", 0),
         "max_peers": user.get("max_peers"),
         "bandwidth_quota": user.get("bandwidth_quota"),
@@ -210,6 +212,7 @@ def apply_import(selections: list[dict]) -> dict:
                 "remote_user_id": src["remote_user_id"],
                 "enabled": 1 if src["enabled"] else 0,
                 "lan_access": 1 if src["lan_access"] else 0,
+                "allow_smart_test": int(src["allow_smart_test"]),
                 "assigned_groups": json.dumps(src["assigned_groups"]),
                 **{f: src[f] for f in LIMIT_FIELDS},
             })

@@ -298,6 +298,7 @@
   "vpnUsers.maxPeers": "En fazla cihaz",
   "vpnUsers.unlimited": "sınırsız",
   "vpnUsers.lanAccess": "LAN erişimi",
+  "vpnUsers.allowSmartTest": "Smart Test'e izin ver",
   "vpnUsers.directRoutes": "Doğrudan yollar",
   "vpnUsers.profileUnhealthy": "kullanılamıyor",
   "vpnUsers.copyPackage": "Kopyala",

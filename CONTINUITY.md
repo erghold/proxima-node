@@ -2,6 +2,19 @@
 
 ## Starting from a copied folder
 
+### Local Smart Test permission — 2026-10-27
+
+ADM now stores `allow_smart_test` per VPN user/site assignment, default false
+for new and migrated rows. API accepts only JSON booleans; sync always sends
+an explicit boolean, including revocation. Import preserves an explicit remote
+boolean/SQLite integer grant and defaults missing or malformed values to false.
+The assignment dialog and matrix expose Allow Smart Test in en/tr/ru.
+Publication authorized on October 27; ADM deployment is held for the parent
+session's GO after site enforcement/migration and host runtime restart. Site
+enforcement is separately owned in Proxima. Deploy site support before grants,
+then re-sync assignments if an older site previously ignored the field.
+Verification and scope: `continuity/sessions/notes/2026-10-27-smart-test-grant.md`.
+
 ## The deploy now carries the revision that was pushed — 2026-10-21
 
 ADM ran as root while the checkout `/opt/erg/proxima-src` belonged to the user

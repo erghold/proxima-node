@@ -56,6 +56,8 @@ def _remote_payload(row: dict) -> dict:
         "assigned_groups": groups,
         "allowed_profiles": profiles,
         "lan_access": bool(row["lan_access"]),
+        "allow_smart_test": type(row.get("allow_smart_test")) in (bool, int)
+        and row["allow_smart_test"] == 1,
     }
 
 

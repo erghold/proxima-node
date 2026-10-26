@@ -24,6 +24,7 @@ interface Props {
 interface Draft {
   granted: boolean;
   lan_access: boolean;
+  allow_smart_test: boolean;
   max_peers: string;
   /** Slot ids of the Direct profiles this user may pick on that site. */
   allowed_profiles: string[];
@@ -63,6 +64,7 @@ export default function VpnUserDialog({ user, servers, onClose, onSaved }: Props
       out[s.id] = {
         granted: Boolean(a),
         lan_access: a?.lan_access ?? true,
+        allow_smart_test: a?.allow_smart_test ?? false,
         max_peers: a?.max_peers != null ? String(a.max_peers) : "",
         allowed_profiles: a?.allowed_profiles ?? [],
       };
@@ -136,6 +138,7 @@ export default function VpnUserDialog({ user, servers, onClose, onSaved }: Props
     const d = drafts[id];
     return {
       lan_access: d.lan_access,
+      allow_smart_test: d.allow_smart_test,
       max_peers: d.max_peers.trim() === "" ? null : Number(d.max_peers),
       allowed_profiles: d.allowed_profiles,
     };
@@ -364,6 +367,15 @@ export default function VpnUserDialog({ user, servers, onClose, onSaved }: Props
                                 />
                               }
                               label={t("vpnUsers.lanAccess")}
+                            />
+                            <FormControlLabel
+                              control={
+                                <Checkbox
+                                  checked={d.allow_smart_test}
+                                  onChange={(e) => setDraft(s.id, { allow_smart_test: e.target.checked })}
+                                />
+                              }
+                              label={t("vpnUsers.allowSmartTest")}
                             />
                             {(serverProfiles[String(s.id)]?.length ?? 0) > 0 && (
                               <Box>

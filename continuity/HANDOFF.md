@@ -1,5 +1,14 @@
 # ADM handoff — evidence and boundaries
 
+Latest 2026-10-27 (publication authorized, live deployment held): per-site `allow_smart_test` grant implemented in
+ADM schema/migration, API validation/serialization, sync, import and dialog/matrix
+UI with en/tr/ru parity. Existing/new assignments default off; unrelated partial
+edits preserve an explicit grant. Site enforcement belongs to the Proxima owner.
+Read-only SSH verified ADM at f992cfe8 with clean tracked files and active service.
+Commit/push is authorized; no live mutation until parent GO. Deploy site support first and re-sync grants after
+upgrades if an old site ignored the field. See
+`sessions/notes/2026-10-27-smart-test-grant.md` for actual checks and next steps.
+
 Latest2026-10-13: update dialog **41a2294** live; **PROX-68 READY_FOR_REVIEW**.
 Two sx edits only; no update/log lifecycle change. Build437 parity/four focused
 mock states/brief QA and one after-gate pass. Current eight UI reviews waiting
