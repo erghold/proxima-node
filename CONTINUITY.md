@@ -4,6 +4,21 @@
 
 ### Local Smart Test permission — 2026-10-27
 
+Deployment completed after parent GO: ADM `dffa0f768ae7932cf8719bd25b14f494dd2dca05`
+is live, service active; loopback/public index and three bundle hashes match.
+Read-only service-database check found107 assignments, all grant0, with the
+INTEGER NOT NULL DEFAULT0 column. Both previous static generations are retained.
+Account/site tests remain parent-owned; human acceptance is not implied.
+
+Parent's subsequent disposable-account end-to-end checks passed independent
+review: default denial, ADM grant/sync, profile enrollment, real Windows SOCKS
+YouTube traffic, and revoke/denial/key removal. Disposable records/process were
+removed; normal VPN keys/policies remained intact. A concurrent external grant
+to an existing account was preserved, leaving one legitimate Smart peer; the
+earlier107/all0 result is migration evidence, not the final grant count.
+Human TUN/video and new-legacy end-to-end acceptance remain pending. Details in
+the Smart Test session note; documentation publication requires no redeployment.
+
 ADM now stores `allow_smart_test` per VPN user/site assignment, default false
 for new and migrated rows. API accepts only JSON booleans; sync always sends
 an explicit boolean, including revocation. Import preserves an explicit remote

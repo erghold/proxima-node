@@ -1,5 +1,19 @@
 # ADM handoff — evidence and boundaries
 
+Deployment follow-up2026-10-27: parent GO received after site enforcement/runtime
+verification. ADM dffa0f768ae7932cf8719bd25b14f494dd2dca05 deployed canonically,
+active/HTTP200; public+loopback index/three bundle hashes match. Service DB schema
+is INTEGER NOT NULL DEFAULT0;107 assignments all0. No account/site mutation by
+the ADM owner. See the Smart Test note for rollback paths and command recovery.
+
+Parent's final disposable-account evidence passed independent bounded review:
+default deny, central grant/sync, enrollment/profile200, real Windows SOCKS
+YouTube200 with live AWG handshake, revoke/profile403 and key removal within
+9.903s. Disposable account/device/process cleaned up; normal VPN state preserved.
+A concurrent external existing-account grant was preserved, so final state has
+one legitimate Smart peer (not all grants0). Human TUN/video and new-legacy E2E
+remain pending. This is a docs-only follow-up; do not redeploy it.
+
 Latest 2026-10-27 (publication authorized, live deployment held): per-site `allow_smart_test` grant implemented in
 ADM schema/migration, API validation/serialization, sync, import and dialog/matrix
 UI with en/tr/ru parity. Existing/new assignments default off; unrelated partial

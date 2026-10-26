@@ -57,3 +57,61 @@ the exact published candidate, then use `sudo bash adm/deploy.sh --no-pull`.
 No live mutation has occurred during preparation. Accepted full46/focused25 tests,
 frontend production build and438-key parity were not redundantly repeated;
 release inspection found no product-code delta beyond that accepted candidate.
+
+## Deployment after parent GO
+
+Published and deployed candidate: `dffa0f768ae7932cf8719bd25b14f494dd2dca05`.
+Parent confirmed site schema, runtime and host-service enforcement before GO.
+Fast-forward and old rollback preservation succeeded. The first streamed command
+passed a Windows CR to `--no-pull`, rejected before build/restart; a subsequent
+quoted shell wrapper failed parsing before execution. Direct canonical invocation
+then completed one build/swap/service restart successfully. No product repair.
+
+One read-only postcheck verified:
+- Live full Git SHA matches candidate; tracked files clean (only static.prev untracked).
+- `proxima-adm` active; canonical HTTP check200 on port5002.
+- Service-selected `/opt/erg/proxima-node/adm/data/adm.db`, opened read-only:
+  column `allow_smart_test INTEGER NOT NULL DEFAULT 0`;107 assignments, all0.
+- Compiled `index-DHQfHbc5.js` contains `Allow Smart Test` and `allow_smart_test`.
+- Index and all3 JS bundles returned200 and matched local deployed SHA256 on
+  both loopback and `https://adm.prxa.net` (8 exact matches).
+- Index SHA256 `4ae7bd61c65543a488e1ff485611c28dc9ceae623740c17950ea27ec507b0781`;
+  main bundle SHA256 `a65a0a384f6177894d11a23a2ae9166db86702c05c03ec4775caff604f1008ef`.
+- Rollback index exists in `adm/backend/static.prev` and preserved older generation
+  `/opt/erg/adm-static.prev-before-dffa0f768ae7932cf8719bd25b14f494dd2dca05`.
+
+Build npm audit reported7 dependency vulnerabilities (1 moderate,6 high), not
+remediated as part of release; existing large-bundle warning remains. No site
+update or account mutation invoked. Parent owns disposable-account checks;
+release success is not human acceptance. This deployment evidence is a local
+documentation follow-up, not an additional deployed product revision.
+
+## Parent-owned end-to-end evidence and final state
+
+The parent supplied the following final evidence, accepted by independent bounded
+test review; the ADM release owner did not repeat these tests or change accounts:
+
+- Disposable central user65 on SVR: default false, discovery `not_authorized`,
+  enrollment403. Explicit ADM grant true synchronized successfully; enrollment
+  and both profile paths returned200.
+- Windows mihomo SOCKS client reached real YouTube through SMART-TEST with HTTP200
+  and a live AWG handshake.
+- ADM revoke false synchronized successfully; both profile paths returned403,
+  discovery denied, and key absence observed within9.903s. First probe found the
+  interface absent; subsequent probe found it ready and empty. The same client
+  then returned YouTube HTTP000 while DIRECT nic.ru remained200.
+- Removed disposable device, deleted access/4 with successful sync, then deleted
+  central user. Disposable records were absent from both databases and the client
+  process was stopped.
+- Normal keys/policies preserved: wg1 and wg2 each40 peers; listeners
+  5555/5556/8443/15558 retained.
+- A concurrent external ADM grant was observed late: central user5, site4,
+  remote user4, grant1 synchronized, with an existing Smart record active again.
+  The parent never granted an existing account and preserved this external work.
+  Final state therefore contains one legitimate existing Smart peer. Earlier
+  all-off observations establish migration behavior, not perpetual final state.
+
+Human TUN/video and new-legacy end-to-end acceptance remain pending. No credentials
+or private profile payloads are included. Documentation-only publication is
+authorized; deployed product remains dffa0f768ae7932cf8719bd25b14f494dd2dca05 and
+must not be restarted or redeployed for this documentation commit.
