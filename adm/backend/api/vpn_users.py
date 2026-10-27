@@ -71,6 +71,8 @@ def _public_user(user: dict, access: list[dict]) -> dict:
     return {
         "id": user["id"],
         "username": user["username"],
+        "update_channel": "beta" if user.get("update_channel") == "beta" else "stable",
+        "allow_pools": user.get("allow_pools") == 1,
         "full_name": user["full_name"],
         "enabled": bool(user["enabled"]),
         "note": user["note"],
@@ -176,6 +178,18 @@ def _parse_access_body(body: dict) -> tuple[dict | None, str | None]:
 
 # ── User CRUD ────────────────────────────────────────────────────────────
 
+def _pool_policy(body):
+    for key in ("allow_pools", "enable_pool_beta"):
+        if key in body:
+            if not is_superadmin():
+                return forbidden("Superadmin only")
+            if type(body[key]) is not bool:
+                return jsonify({"ok": False, "error": f"{key} must be a boolean"}), 400
+    if "enable_pool_beta" in body:
+        body["allow_pools"] = body["enable_pool_beta"]
+        body["update_channel"] = "beta" if body["enable_pool_beta"] else "stable"
+    return None
+
 @bp.get("/api/vpn-users")
 def list_users():
     """Central users with their authorizations, limited to the caller's scope.
@@ -206,6 +220,15 @@ def list_users():
 def add_user():
     """Create a user. Password is generated unless supplied, returned once."""
     body = request.get_json(silent=True) or {}
+    error = _pool_policy(body)
+    if error:
+        return error
+
+    if "update_channel" in body and (
+        not isinstance(body["update_channel"], str)
+        or body["update_channel"] not in ("stable", "beta")
+    ):
+        return jsonify({"ok": False, "error": "update_channel must be stable or beta"}), 400
 
     username = (body.get("username") or "").strip().lower()
     if not username:
@@ -247,6 +270,8 @@ def add_user():
 
     user_id = create_vpn_user({
         "username": username,
+        "update_channel": body.get("update_channel", "stable"),
+        "allow_pools": body.get("allow_pools", False),
         "full_name": (body.get("full_name") or "").strip(),
         "password_hash": hash_password(password),
         "enabled": body.get("enabled", True),
@@ -289,7 +314,17 @@ def edit_user(user_id: int):
 
     body = request.get_json(silent=True) or {}
     updates: dict = {}
+    error = _pool_policy(body)
+    if error:
+        return error
+    if "allow_pools" in body:
+        updates["allow_pools"] = int(body["allow_pools"])
     new_password: str | None = None
+
+    if "update_channel" in body:
+        if not isinstance(body["update_channel"], str) or body["update_channel"] not in ("stable", "beta"):
+            return jsonify({"ok": False, "error": "update_channel must be stable or beta"}), 400
+        updates["update_channel"] = body["update_channel"]
 
     access = get_user_access(user_id)
 
@@ -334,7 +369,7 @@ def edit_user(user_id: int):
 
     # Only fields the Proxima instances actually replicate need a re-push.
     # full_name and note are ADM-side bookkeeping.
-    if updates.keys() & {"password_hash", "enabled", "username"}:
+    if updates.keys() & {"password_hash", "enabled", "username", "update_channel"}:
         mark_all_access_pending(user_id)
 
     log.info(f"[VPN-USERS] Updated central user '{user['username']}' "

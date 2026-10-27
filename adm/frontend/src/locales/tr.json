@@ -1,4 +1,9 @@
 {
+  "vpnUsers.enablePoolBeta": "Havuz betasını etkinleştir",
+  "vpnUsers.updateChannel": "İstemci güncelleme kanalı",
+  "vpnUsers.updateChannelHelp": "Tüm siteler için yönetici belirler. Smart Test'ten bağımsızdır; kullanıcı değiştiremez.",
+  "vpnUsers.updateChannelStable": "Kararlı",
+  "vpnUsers.updateChannelBeta": "Beta",
   "app.title": "Proxima ADM",
   "docs.title": "Dokümantasyon",
   "docs.notFound": "Doküman bulunamadı",

@@ -1,4 +1,9 @@
 {
+  "vpnUsers.enablePoolBeta": "Включить бета-версию пулов",
+  "vpnUsers.updateChannel": "Канал обновлений клиента",
+  "vpnUsers.updateChannelHelp": "Задаётся администратором для всех сайтов. Не зависит от Smart Test; пользователь не может изменить его.",
+  "vpnUsers.updateChannelStable": "Стабильный",
+  "vpnUsers.updateChannelBeta": "Бета",
   "app.title": "Proxima ADM",
   "docs.title": "Документация",
   "docs.notFound": "Документ не найден",

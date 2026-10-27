@@ -1,4 +1,9 @@
 {
+  "vpnUsers.enablePoolBeta": "Enable pool beta",
+  "vpnUsers.updateChannel": "Client update channel",
+  "vpnUsers.updateChannelHelp": "Admin-managed for all sites. Independent of Smart Test; users cannot change it.",
+  "vpnUsers.updateChannelStable": "Stable",
+  "vpnUsers.updateChannelBeta": "Beta",
   "app.title": "Proxima ADM",
   "docs.title": "Documentation",
   "docs.notFound": "Document not found",

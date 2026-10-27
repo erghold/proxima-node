@@ -4,6 +4,7 @@ import json
 import sqlite3
 import threading
 import time
+import uuid
 
 from core.config import DB_PATH
 
@@ -212,6 +213,7 @@ def init_db() -> None:
             id            INTEGER PRIMARY KEY AUTOINCREMENT,
             username      TEXT NOT NULL UNIQUE,
             full_name     TEXT NOT NULL DEFAULT '',
+            update_channel TEXT NOT NULL DEFAULT 'stable',
             password_hash TEXT NOT NULL,
             enabled       INTEGER NOT NULL DEFAULT 1,
             note          TEXT NOT NULL DEFAULT '',
@@ -267,6 +269,9 @@ def init_db() -> None:
 
     # Schema migrations
     _migrate(conn)
+    from core.pool_db import migrate, migrate_delivery
+    migrate(conn)
+    migrate_delivery(conn)
 
 
 def _migrate(conn: sqlite3.Connection) -> None:
@@ -298,6 +303,9 @@ def _migrate(conn: sqlite3.Connection) -> None:
     # carry the password only when ADM's copy is the newer one, so routine
     # limit changes stop clobbering a password the user just chose.
     user_cols = {r[1] for r in conn.execute("PRAGMA table_info(vpn_users)").fetchall()}
+    if user_cols and "update_channel" not in user_cols:
+        conn.execute("ALTER TABLE vpn_users ADD COLUMN update_channel TEXT NOT NULL DEFAULT 'stable'")
+        conn.commit()
     if user_cols and "password_changed_at" not in user_cols:
         conn.execute("ALTER TABLE vpn_users ADD COLUMN password_changed_at INTEGER")
         conn.execute("UPDATE vpn_users SET password_changed_at = updated_at")
@@ -918,8 +926,8 @@ def get_server_profiles(vpn_server_id: int) -> list[dict]:
 
 def delete_vpn_server(vpn_server_id: int) -> bool:
     conn = get_conn()
-    cur = conn.execute("DELETE FROM vpn_servers WHERE id = ?", (vpn_server_id,))
-    conn.commit()
+    with conn:
+        cur = conn.execute("DELETE FROM vpn_servers WHERE id = ?", (vpn_server_id,))
     return cur.rowcount > 0
 
 
@@ -1131,10 +1139,12 @@ def create_vpn_user(data: dict) -> int:
     ts = int(time.time())
     cur = conn.execute(
         "INSERT INTO vpn_users (username, full_name, password_hash, enabled, note, "
-        "password_changed_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        "password_changed_at, created_at, updated_at, update_channel, account_id, allow_pools) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             data["username"], data.get("full_name", ""), data["password_hash"],
             1 if data.get("enabled", True) else 0, data.get("note", ""), ts, ts, ts,
+            data.get("update_channel", "stable"),
+            str(uuid.uuid4()), int(data.get("allow_pools", False)),
         ),
     )
     conn.commit()
@@ -1163,7 +1173,7 @@ def get_all_vpn_users() -> list[dict]:
 
 def update_vpn_user(user_id: int, updates: dict) -> bool:
     conn = get_conn()
-    allowed = {"username", "full_name", "password_hash", "enabled", "note"}
+    allowed = {"username", "full_name", "password_hash", "enabled", "note", "update_channel", "allow_pools"}
     sets, vals = [], []
     for key, val in updates.items():
         if key in allowed:
@@ -1315,7 +1325,7 @@ def get_pending_access(vpn_server_id: int | None = None) -> list[dict]:
     conn = get_conn()
     sql = (
         "SELECT a.*, u.username, u.password_hash, u.enabled AS user_enabled, "
-        "u.password_changed_at, s.name AS server_name "
+        "u.password_changed_at, u.update_channel AS user_update_channel, s.name AS server_name "
         "FROM vpn_user_access a "
         "JOIN vpn_users u ON a.user_id = u.id "
         "JOIN vpn_servers s ON a.vpn_server_id = s.id "
@@ -1400,11 +1410,11 @@ def get_sync_summary() -> dict:
 
 
 def mark_all_access_pending(user_id: int) -> None:
-    """Called when identity fields (password, enabled) change for a user."""
+    """Re-push identity changes without resurrecting queued revocations."""
     conn = get_conn()
     conn.execute(
         "UPDATE vpn_user_access SET sync_status = 'pending', updated_at = ? "
-        "WHERE user_id = ?",
+        "WHERE user_id = ? AND sync_status != 'pending_delete'",
         (int(time.time()), user_id),
     )
     conn.commit()

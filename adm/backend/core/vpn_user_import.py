@@ -63,6 +63,7 @@ def _source_from_remote(fetched: dict, user: dict) -> dict:
         "server_name": fetched["server_name"],
         "server_display_name": fetched["server_display_name"],
         "remote_user_id": user["id"],
+        "update_channel": user.get("update_channel"),
         "enabled": bool(user.get("enabled", 1)),
         "lan_access": bool(user.get("lan_access", 1)),
         "allow_smart_test": type(user.get("allow_smart_test")) in (bool, int)
@@ -226,9 +227,11 @@ def apply_import(selections: list[dict]) -> dict:
                 or (primary_plain is not None
                     and plains[src["vpn_server_id"]] == primary_plain)
             )
-            if same_password:
+            # Import never owns channel policy; a mismatch must be pushed back.
+            channel = "beta" if central and central.get("update_channel") == "beta" else "stable"
+            if same_password and src["update_channel"] == channel:
                 mark_access_synced(access_id, remote_user_id=src["remote_user_id"])
-            else:
+            elif not same_password:
                 overrides.append({
                     "username": username,
                     "server_name": src["server_name"],

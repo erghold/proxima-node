@@ -21,6 +21,8 @@
 #   -e proxima_src=/path      source checkout on this host (default below)
 #   -e skip_callhome=true     already has a tunnel, only install Proxima
 #   -e skip_proxima=true      only establish the tunnel (kit preparation)
+#   -e backend_only=true     update only the existing management container;
+#                            requires skip_callhome=true and a preservation-safe startup
 #
 # Re-running this is how a site is updated: the source is re-synced, the
 # installer runs again, and the recorded revision moves forward.
@@ -38,6 +40,7 @@
     callhome_iface: "wg-erg"
     skip_callhome: false
     skip_proxima: false
+    backend_only: false
     answers_path: "/root/.proxima-install-answers.json"
     # The tunnel's moving parts. The CLI and the unit are the files the
     # exit-node role vendors — referenced, not copied, so there is one set to
@@ -75,6 +78,26 @@
         that: callhome_conf_b64 is defined and callhome_conf_b64 | length > 0
         fail_msg: "callhome_conf_b64 is required unless skip_callhome=true"
       when: not skip_callhome | bool
+
+    - name: Require an existing isolated management update
+      ansible.builtin.assert:
+        that:
+          - skip_callhome | bool
+          - not skip_proxima | bool
+        quiet: true
+      when: backend_only | bool
+
+    - name: Check existing site configuration for management-only update
+      ansible.builtin.stat:
+        path: "{{ install_path }}/config/proxima-config.json"
+      register: existing_site_config
+      when: backend_only | bool
+
+    - name: Reject management-only bootstrap
+      ansible.builtin.assert:
+        that: existing_site_config.stat.isreg | default(false)
+        quiet: true
+      when: backend_only | bool
 
   tasks:
     # ── 1. Call-home tunnel ────────────────────────────────────────────────
@@ -328,7 +351,7 @@
         owner: root
         group: root
         mode: "0600"
-      when: not skip_proxima | bool
+      when: not skip_proxima | bool and not backend_only | bool
 
     - name: Run the installer
       # Streams straight through to the operation log so a failure is readable
@@ -338,17 +361,44 @@
         chdir: "{{ install_path }}"
       register: proxima_install
       changed_when: true
-      when: not skip_proxima | bool
+      when: not skip_proxima | bool and not backend_only | bool
 
     - name: Show installer output
       ansible.builtin.debug:
         var: proxima_install.stdout_lines
-      when: not skip_proxima | bool
+      when: not skip_proxima | bool and not backend_only | bool
 
     - name: Remove the answer file
       ansible.builtin.file:
         path: "{{ answers_path }}"
         state: absent
+      when: not skip_proxima | bool and not backend_only | bool
+
+    - name: Build only the management image
+      ansible.builtin.command:
+        argv: [docker, compose, build, proxima]
+        chdir: "{{ install_path }}/docker"
+      when: backend_only | bool
+
+    - name: Replace only the management container without dependencies
+      ansible.builtin.command:
+        argv: [docker, compose, up, -d, --no-deps, proxima]
+        chdir: "{{ install_path }}/docker"
+      when: backend_only | bool
+
+    - name: Wait for the Proxima API
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:5050/api/status"
+        status_code: 200
+      register: proxima_api
+      retries: 12
+      delay: 5
+      until: proxima_api.status | default(0) == 200
+      # A plain GET against the box's own API. Checking it under --check is the
+      # point of the task — it answers "is this site actually serving?" without
+      # having deployed anything — and skipping it left `until` reading a status
+      # that was never set, so --check died here instead of finishing.
+      check_mode: false
       when: not skip_proxima | bool
 
     - name: Record the deployed revision
@@ -364,21 +414,6 @@
         owner: root
         group: root
         mode: "0644"
-      when: not skip_proxima | bool
-
-    - name: Wait for the Proxima API
-      ansible.builtin.uri:
-        url: "http://127.0.0.1:5050/api/status"
-        status_code: 200
-      register: proxima_api
-      retries: 12
-      delay: 5
-      until: proxima_api.status | default(0) == 200
-      # A plain GET against the box's own API. Checking it under --check is the
-      # point of the task — it answers "is this site actually serving?" without
-      # having deployed anything — and skipping it left `until` reading a status
-      # that was never set, so --check died here instead of finishing.
-      check_mode: false
       when: not skip_proxima | bool
 
     - name: Report

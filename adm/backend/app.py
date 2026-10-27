@@ -73,6 +73,12 @@ def create_app() -> Flask:
     app.register_blueprint(vpn_sync_bp)
     app.register_blueprint(admins_bp)
     app.register_blueprint(monitoring_bp)
+    from api.pool_client import bp as pool_client_bp
+    from api.pool_catalog import bp as pool_catalog_bp
+    from api.pool_attachments import bp as pool_attachments_bp
+    app.register_blueprint(pool_client_bp)
+    app.register_blueprint(pool_catalog_bp)
+    app.register_blueprint(pool_attachments_bp)
 
     # Auth middleware
     # /api/vpn/discover IS a login (the single-login client's) and
@@ -104,6 +110,11 @@ def create_app() -> Flask:
         path = request.path
 
         if not path.startswith("/api/"):
+            return None
+
+        # These routes authenticate opaque client sessions themselves. Never
+        # interpret an admin JWT here, even when usernames happen to coincide.
+        if request.endpoint and request.endpoint.split(".")[0] == "pool_client":
             return None
 
         # ssconf proxy — authenticated via URL token, not JWT

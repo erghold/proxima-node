@@ -51,12 +51,23 @@ def start_scheduler() -> None:
     """Start the background scheduler thread."""
     thread = threading.Thread(target=_loop, daemon=True, name="adm-scheduler")
     thread.start()
+    threading.Thread(target=_pool_delivery_loop, daemon=True, name="adm-pool-delivery").start()
     log.info(f"Scheduler started, interval: {POLL_INTERVAL}s")
 
 
 def stop_scheduler() -> None:
     """Signal the scheduler to stop."""
     _stop.set()
+
+
+def _pool_delivery_loop() -> None:
+    # Independent of metrics/password/legacy-user sync, which may wait on offline sites.
+    from core.pool_attachment_sync import reconcile
+    while not _stop.wait(timeout=60):
+        try:
+            reconcile(limit=10)
+        except Exception:
+            log.exception("Pool authorization delivery error")
 
 
 def _loop() -> None:

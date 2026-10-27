@@ -116,7 +116,10 @@ def check_rate_limit(key: str, max_attempts: int = MAX_ATTEMPTS) -> int | None:
     with _rate_lock:
         timestamps = _fail_tracker.get(key, [])
         timestamps = [t for t in timestamps if now - t < RATE_WINDOW + LOCKOUT_SECONDS]
-        _fail_tracker[key] = timestamps
+        if timestamps:
+            _fail_tracker[key] = timestamps
+        else:
+            _fail_tracker.pop(key, None)
         recent = [t for t in timestamps if now - t < RATE_WINDOW]
         if len(recent) >= max_attempts:
             last_fail = max(recent)

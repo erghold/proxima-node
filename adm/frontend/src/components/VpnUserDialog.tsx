@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Alert, Box, Button, Checkbox, Chip, Dialog, DialogActions, DialogContent,
   DialogTitle, Divider, FormControlLabel, Grid2 as Grid, IconButton, Paper,
-  Stack, TextField, Typography,
+  MenuItem, Stack, TextField, Typography,
 } from "@mui/material";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import VisibilityIcon from "@mui/icons-material/Visibility";
@@ -14,6 +14,7 @@ import type {
 } from "../api/types";
 
 interface Props {
+  isSuperadmin: boolean;
   user: VpnUser | null;          // null = create
   servers: VpnServer[];
   onClose: () => void;
@@ -47,7 +48,7 @@ const apiError = (err: unknown): string | undefined =>
 const syncFailures = (sync: SyncResult): string =>
   (sync?.failed ?? []).map((f) => `${f.target}: ${f.error}`).join(", ");
 
-export default function VpnUserDialog({ user, servers, onClose, onSaved }: Props) {
+export default function VpnUserDialog({ user, servers, isSuperadmin, onClose, onSaved }: Props) {
   const { t } = useTranslation();
   const isNew = user === null;
 
@@ -55,6 +56,8 @@ export default function VpnUserDialog({ user, servers, onClose, onSaved }: Props
   const [fullName, setFullName] = useState(user?.full_name ?? "");
   const [note, setNote] = useState(user?.note ?? "");
   const [enabled, setEnabled] = useState(user?.enabled ?? true);
+  const [allowPools, setAllowPools] = useState(user?.allow_pools ?? false);
+  const [updateChannel, setUpdateChannel] = useState<"stable" | "beta">(user?.update_channel === "beta" ? "beta" : "stable");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [drafts, setDrafts] = useState<Record<number, Draft>>(() => {
@@ -155,6 +158,8 @@ export default function VpnUserDialog({ user, servers, onClose, onSaved }: Props
           note: note.trim(),
           password: password.trim(),
           enabled,
+          update_channel: updateChannel,
+          ...(isSuperadmin ? { allow_pools: allowPools } : {}),
           servers: grantedServers.map((s) => ({ vpn_server_id: s.id, ...accessBody(s.id) })),
         });
         if (!data.ok) { setError(data.error); setSaving(false); return; }
@@ -177,6 +182,8 @@ export default function VpnUserDialog({ user, servers, onClose, onSaved }: Props
         full_name: fullName.trim(),
         note: note.trim(),
         enabled,
+        update_channel: updateChannel,
+        ...(isSuperadmin ? { allow_pools: allowPools } : {}),
       });
       if (!data.ok) { setError(data.error); setSaving(false); return; }
 
@@ -251,6 +258,27 @@ export default function VpnUserDialog({ user, servers, onClose, onSaved }: Props
         ) : (
           <Stack spacing={3} sx={{ mt: 1 }}>
             <Grid container spacing={2}>
+              {isSuperadmin && <Grid size={12}>
+                <FormControlLabel
+                  control={<Checkbox checked={allowPools} onChange={(e) => {
+                    setAllowPools(e.target.checked);
+                    setUpdateChannel(e.target.checked ? "beta" : "stable");
+                  }} />}
+                  label={t("vpnUsers.enablePoolBeta")}
+                />
+              </Grid>}
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField
+                  select fullWidth
+                  label={t("vpnUsers.updateChannel")}
+                  helperText={t("vpnUsers.updateChannelHelp")}
+                  value={updateChannel}
+                  onChange={(e) => setUpdateChannel(e.target.value as "stable" | "beta")}
+                >
+                  <MenuItem value="stable">{t("vpnUsers.updateChannelStable")}</MenuItem>
+                  <MenuItem value="beta">{t("vpnUsers.updateChannelBeta")}</MenuItem>
+                </TextField>
+              </Grid>
               <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField
                   label={t("vpnUsers.username")}
