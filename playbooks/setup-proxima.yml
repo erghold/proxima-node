@@ -330,6 +330,7 @@
         # config/ holds this server's identity, keys and peers — replacing it
         # would be a wipe, not an update. .env is likewise site-local.
         rsync_opts:
+          - "--chown=root:root"
           - "--exclude=config/"
           - "--exclude=docker/.env"
       when: not skip_proxima | bool
