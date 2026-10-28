@@ -1,4 +1,22 @@
 ---
+- name: Inspect existing Reality configuration
+  ansible.builtin.stat:
+    path: "{{ xray_dir }}/config.json"
+  register: xray_existing_config
+
+- name: Read existing Reality configuration without reconstructing its clients
+  ansible.builtin.slurp:
+    src: "{{ xray_dir }}/config.json"
+  register: xray_config_content
+  when: xray_existing_config.stat.exists
+  no_log: true
+
+- name: Preserve existing listener port on role reruns
+  ansible.builtin.set_fact:
+    vless_port: "{{ ((xray_config_content.content | b64decode | from_json).inbounds | selectattr('protocol', 'equalto', 'vless') | first).port }}"
+  when: xray_existing_config.stat.exists
+  no_log: true
+
 - name: Ensure unzip is installed
   ansible.builtin.apt:
     name: unzip
@@ -54,23 +72,32 @@
     path: "{{ xray_dir }}/keys.json"
   register: keys_file
 
+- name: Refuse to regenerate keys for an existing listener
+  ansible.builtin.assert:
+    that:
+      - not xray_existing_config.stat.exists or keys_file.stat.exists
+    fail_msg: Existing configuration requires its original keys.json; refusing key rotation
+
 - name: Generate VLESS UUID
   ansible.builtin.command:
     cmd: "{{ xray_dir }}/xray uuid"
   register: uuid_result
   when: not keys_file.stat.exists
+  no_log: true
 
 - name: Generate x25519 keypair
   ansible.builtin.command:
     cmd: "{{ xray_dir }}/xray x25519"
   register: x25519_result
   when: not keys_file.stat.exists
+  no_log: true
 
 - name: Generate random short ID
   ansible.builtin.command:
     cmd: "openssl rand -hex 8"
   register: shortid_result
   when: not keys_file.stat.exists
+  no_log: true
 
 - name: Parse x25519 output
   ansible.builtin.set_fact:
@@ -79,6 +106,7 @@
     vless_public_key: "{{ x25519_result.stdout_lines | select('match', '^Public key:') | first | regex_replace('^Public key: ', '') }}"
     vless_short_id: "{{ shortid_result.stdout | trim }}"
   when: not keys_file.stat.exists
+  no_log: true
 
 - name: Write keys.json
   ansible.builtin.copy:
@@ -96,12 +124,14 @@
     group: root
     mode: "0600"
   when: not keys_file.stat.exists
+  no_log: true
 
 - name: Read existing keys.json
   ansible.builtin.slurp:
     src: "{{ xray_dir }}/keys.json"
   register: keys_content
   when: keys_file.stat.exists
+  no_log: true
 
 - name: Load existing keys
   ansible.builtin.set_fact:
@@ -110,6 +140,7 @@
     vless_public_key: "{{ (keys_content.content | b64decode | from_json).public_key }}"
     vless_short_id: "{{ (keys_content.content | b64decode | from_json).short_id }}"
   when: keys_file.stat.exists
+  no_log: true
 
 # ── Configuration & Service ─────────────────────────────────────────────
 
@@ -120,7 +151,17 @@
     owner: root
     group: root
     mode: "0600"
+    force: false
+    validate: "{{ xray_dir }}/xray run -test -config %s"
+  when: not xray_existing_config.stat.exists
+  no_log: true
   notify: restart xray-reality
+
+- name: Validate preserved configuration with the installed Xray parser
+  ansible.builtin.command:
+    argv: ["{{ xray_dir }}/xray", run, -test, -config, "{{ xray_dir }}/config.json"]
+  changed_when: false
+  no_log: true
 
 - name: Deploy xray-reality systemd service
   ansible.builtin.template:

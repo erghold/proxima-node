@@ -1,0 +1,37 @@
+---
+# Explicit single exit required; does not install, rotate keys, or change ports.
+- name: Add dedicated ERG Reality client
+  hosts: "{{ xray_target | mandatory }}"
+  gather_facts: false
+  become: true
+  serial: 1
+  any_errors_fatal: true
+  tasks:
+    - name: Require one explicit exit and stable slot label
+      ansible.builtin.assert:
+        that:
+          - ansible_play_hosts_all | length == 1
+          - inventory_hostname in groups.get('vpn_exit', [])
+          - xray_client_label is match('^erg-slot-[1-9][0-9]*$')
+          - xray_client_server is match('^[A-Za-z0-9.:-]+$')
+
+    - name: Install bounded client provisioner
+      ansible.builtin.copy:
+        src: ../scripts/xray-add-client.py
+        dest: /opt/xray-reality/add-client.py
+        owner: root
+        group: root
+        mode: "0700"
+
+    - name: Validate and provision dedicated client
+      ansible.builtin.command:
+        argv:
+          - python3
+          - /opt/xray-reality/add-client.py
+          - --label
+          - "{{ xray_client_label }}"
+          - --server
+          - "{{ xray_client_server }}"
+      register: client_result
+      changed_when: client_result.stdout == 'changed'
+      no_log: true
