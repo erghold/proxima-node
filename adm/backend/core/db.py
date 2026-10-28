@@ -303,6 +303,9 @@ def _migrate(conn: sqlite3.Connection) -> None:
     # carry the password only when ADM's copy is the newer one, so routine
     # limit changes stop clobbering a password the user just chose.
     user_cols = {r[1] for r in conn.execute("PRAGMA table_info(vpn_users)").fetchall()}
+    if user_cols and "deletion_pending" not in user_cols:
+        conn.execute("ALTER TABLE vpn_users ADD COLUMN deletion_pending INTEGER NOT NULL DEFAULT 0")
+        conn.commit()
     if user_cols and "update_channel" not in user_cols:
         conn.execute("ALTER TABLE vpn_users ADD COLUMN update_channel TEXT NOT NULL DEFAULT 'stable'")
         conn.commit()
@@ -1188,9 +1191,31 @@ def update_vpn_user(user_id: int, updates: dict) -> bool:
     sets.append("updated_at = ?")
     vals.append(now)
     vals.append(user_id)
-    conn.execute(f"UPDATE vpn_users SET {', '.join(sets)} WHERE id = ?", vals)
+    cur = conn.execute(
+        f"UPDATE vpn_users SET {', '.join(sets)} WHERE id = ? AND deletion_pending = 0", vals
+    )
     conn.commit()
-    return True
+    return cur.rowcount > 0
+
+
+def request_vpn_user_deletion(user_id: int) -> None:
+    """Disable centrally and durably queue every replica before removing identity."""
+    conn = get_conn()
+    ts = int(time.time())
+    with conn:
+        conn.execute(
+            "UPDATE vpn_users SET deletion_pending = 1, enabled = 0, updated_at = ? WHERE id = ?",
+            (ts, user_id),
+        )
+        conn.execute(
+            "UPDATE vpn_user_access SET sync_status = 'pending_delete', updated_at = ? WHERE user_id = ?",
+            (ts, user_id),
+        )
+        conn.execute(
+            "DELETE FROM vpn_users WHERE id = ? AND deletion_pending = 1 "
+            "AND NOT EXISTS (SELECT 1 FROM vpn_user_access WHERE user_id = vpn_users.id)",
+            (user_id,),
+        )
 
 
 def delete_vpn_user(user_id: int) -> bool:
@@ -1252,7 +1277,7 @@ def get_access(user_id: int, vpn_server_id: int) -> dict | None:
     return dict(row) if row else None
 
 
-def upsert_user_access(user_id: int, vpn_server_id: int, data: dict) -> int:
+def upsert_user_access(user_id: int, vpn_server_id: int, data: dict) -> int | None:
     """Create or update an access row. Any change marks it pending re-sync."""
     conn = get_conn()
     ts = int(time.time())
@@ -1265,18 +1290,20 @@ def upsert_user_access(user_id: int, vpn_server_id: int, data: dict) -> int:
                 sets.append(f"{key} = ?")
                 vals.append(val)
         sets += ["sync_status = 'pending'", "updated_at = ?"]
-        vals += [ts, existing["id"]]
-        conn.execute(
-            f"UPDATE vpn_user_access SET {', '.join(sets)} WHERE id = ?", vals
+        vals += [ts, existing["id"], user_id]
+        cur = conn.execute(
+            f"UPDATE vpn_user_access SET {', '.join(sets)} WHERE id = ? "
+            "AND EXISTS (SELECT 1 FROM vpn_users WHERE id = ? AND deletion_pending = 0)", vals
         )
         conn.commit()
-        return existing["id"]
+        return existing["id"] if cur.rowcount else None
 
     cur = conn.execute(
         "INSERT INTO vpn_user_access (user_id, vpn_server_id, remote_user_id, enabled, "
         "max_peers, bandwidth_quota, speed_download, speed_upload, assigned_groups, "
         "allowed_profiles, lan_access, allow_smart_test, sync_status, created_at, updated_at) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)",
+        "SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ? "
+        "WHERE EXISTS (SELECT 1 FROM vpn_users WHERE id = ? AND deletion_pending = 0)",
         (
             user_id, vpn_server_id, data.get("remote_user_id"),
             1 if data.get("enabled", True) else 0,
@@ -1286,11 +1313,11 @@ def upsert_user_access(user_id: int, vpn_server_id: int, data: dict) -> int:
             data.get("allowed_profiles", "[]"),
             1 if data.get("lan_access", True) else 0,
             int(type(data.get("allow_smart_test")) in (bool, int)
-                and data["allow_smart_test"] == 1), ts, ts,
+                and data["allow_smart_test"] == 1), ts, ts, user_id,
         ),
     )
     conn.commit()
-    return cur.lastrowid
+    return cur.lastrowid if cur.rowcount else None
 
 
 def mark_access_pending_delete(user_id: int, vpn_server_id: int) -> bool:
@@ -1315,6 +1342,11 @@ def delete_user_access(user_id: int, vpn_server_id: int) -> bool:
     cur = conn.execute(
         "DELETE FROM vpn_user_access WHERE user_id = ? AND vpn_server_id = ?",
         (user_id, vpn_server_id),
+    )
+    conn.execute(
+        "DELETE FROM vpn_users WHERE id = ? AND deletion_pending = 1 "
+        "AND NOT EXISTS (SELECT 1 FROM vpn_user_access WHERE user_id = vpn_users.id)",
+        (user_id,),
     )
     conn.commit()
     return cur.rowcount > 0
@@ -1348,7 +1380,9 @@ def mark_access_synced(access_id: int, remote_user_id: int | None = None,
     """
     conn = get_conn()
     ts = int(time.time())
-    sets = ["sync_status = 'synced'", "sync_error = NULL", "synced_at = ?"]
+    # An in-flight push must not erase a deletion requested while it ran.
+    sets = ["sync_status = CASE WHEN sync_status = 'pending_delete' THEN sync_status ELSE 'synced' END",
+            "sync_error = NULL", "synced_at = ?"]
     vals: list = [ts]
     if remote_user_id is not None:
         sets.append("remote_user_id = ?")

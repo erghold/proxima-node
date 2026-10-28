@@ -366,6 +366,7 @@ export interface ServerProfiles {
 }
 
 export interface VpnUser {
+  deletion_pending: boolean;
   allow_pools: boolean;
   update_channel: "stable" | "beta";
   id: number;

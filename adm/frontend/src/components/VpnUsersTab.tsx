@@ -4,6 +4,7 @@ import {
   ListItemText, MenuItem, Paper, Select, Snackbar, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, TableSortLabel, TextField, Tooltip,
   Typography,
+  Dialog, DialogActions, DialogContent, DialogTitle,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import RefreshIcon from "@mui/icons-material/Refresh";
@@ -15,6 +16,7 @@ import BlockIcon from "@mui/icons-material/Block";
 import AltRouteIcon from "@mui/icons-material/AltRoute";
 import ScienceIcon from "@mui/icons-material/Science";
 import ClearIcon from "@mui/icons-material/Clear";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import { useTranslation } from "react-i18next";
 import api from "../api/client";
 import type {
@@ -128,6 +130,9 @@ export default function VpnUsersTab({ isSuperadmin }: { isSuperadmin: boolean })
   const [savingChannels, setSavingChannels] = useState(new Set<number>());
   const [dialogUser, setDialogUser] = useState<VpnUser | null | "new">(null);
   const [revoking, setRevoking] = useState<{ user: VpnUser; server: VpnServer } | null>(null);
+  const [deleting, setDeleting] = useState<VpnUser | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const deleteRequest = useRef(false);
   const [snack, setSnack] = useState<{ msg: string; error?: boolean; warn?: boolean } | null>(null);
 
   // Column state
@@ -150,9 +155,9 @@ export default function VpnUsersTab({ isSuperadmin }: { isSuperadmin: boolean })
         const sum = await api.get("/vpn-users/sync/status");
         if (sum.data.ok) setSummary(sum.data.data);
       }
-    } catch { /* handled by interceptor */ }
+    } catch { setSnack({ msg: t("vpnUsers.requestFailed"), error: true }); }
     setLoading(false);
-  }, [isSuperadmin]);
+  }, [isSuperadmin, t]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
@@ -242,6 +247,7 @@ export default function VpnUsersTab({ isSuperadmin }: { isSuperadmin: boolean })
   }, []);
 
   const grant = async (user: VpnUser, server: VpnServer, patch: Record<string, unknown>) => {
+    if (user.deletion_pending || deletingId === user.id) return;
     const key = `${user.id}:${server.id}`;
     setBusy(key);
     try {
@@ -256,7 +262,7 @@ export default function VpnUsersTab({ isSuperadmin }: { isSuperadmin: boolean })
   };
 
   const changeChannel = async (user: VpnUser, channel: VpnUser["update_channel"]) => {
-    if (channel === user.update_channel || channelRequests.current.has(user.id)) return;
+    if (user.deletion_pending || deletingId === user.id || channel === user.update_channel || channelRequests.current.has(user.id)) return;
     channelRequests.current.add(user.id);
     setSavingChannels(new Set(channelRequests.current));
     try {
@@ -293,6 +299,33 @@ export default function VpnUsersTab({ isSuperadmin }: { isSuperadmin: boolean })
     }
     setBusy(null);
     fetchAll();
+  };
+
+  const confirmDelete = async () => {
+    if (!deleting || deleteRequest.current) return;
+    deleteRequest.current = true;
+    setDeletingId(deleting.id);
+    try {
+      const { data } = await api.delete(`/vpn-users/${deleting.id}?cascade=true`);
+      if (!data.ok) {
+        setSnack({ msg: data.error || t("vpnUsers.requestFailed"), error: true });
+        return;
+      }
+      setUsers((current) => data.data.pending_sync
+        ? current.map((u) => u.id === deleting.id ? { ...u, enabled: false, deletion_pending: true } : u)
+        : current.filter((u) => u.id !== deleting.id));
+      setDeleting(null);
+      setSnack({ msg: t(data.data.pending_sync ? "vpnUsers.deleteQueued" : "vpnUsers.deleteDone"), warn: data.data.pending_sync });
+      reportSync(data.data.sync);
+      await fetchAll();
+    } catch (err: unknown) {
+      const message = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      setSnack({ msg: message || t("vpnUsers.requestFailed"), error: true });
+      await fetchAll();
+    } finally {
+      deleteRequest.current = false;
+      setDeletingId(null);
+    }
   };
 
   const syncAll = async () => {
@@ -377,7 +410,7 @@ export default function VpnUsersTab({ isSuperadmin }: { isSuperadmin: boolean })
         </Alert>
       ) : null}
 
-      {servers.length === 0 ? (
+      {servers.length === 0 && users.length === 0 ? (
         <Typography color="text.secondary">{t("dashboard.noVpnServers")}</Typography>
       ) : (
         <TableContainer component={Paper} sx={{ overflowX: "auto", border: 1, borderColor: "divider", scrollPaddingLeft: 300 }}>
@@ -524,7 +557,7 @@ export default function VpnUsersTab({ isSuperadmin }: { isSuperadmin: boolean })
                     <Box
                       component="button"
                       onClick={() => setDialogUser(u)}
-                      disabled={savingChannels.has(u.id)}
+                      disabled={u.deletion_pending || deletingId === u.id || savingChannels.has(u.id)}
                       sx={{
                         background: "none", border: 0, p: 0, cursor: "pointer",
                         color: "primary.main", textAlign: "left", font: "inherit",
@@ -533,10 +566,20 @@ export default function VpnUsersTab({ isSuperadmin }: { isSuperadmin: boolean })
                     >
                       {u.username}
                     </Box>
+                    <Tooltip title={t("vpnUsers.deleteTitle")}>
+                      <span>
+                        <IconButton size="small" color="error"
+                          aria-label={t("vpnUsers.deleteUser", { username: u.username })}
+                          disabled={u.deletion_pending || deletingId !== null || savingChannels.has(u.id) || busy !== null}
+                          onClick={() => setDeleting(u)}>
+                          <DeleteOutlineIcon fontSize="small" />
+                        </IconButton>
+                      </span>
+                    </Tooltip>
                     <Select
                       size="small"
                       value={u.update_channel}
-                      disabled={savingChannels.has(u.id)}
+                      disabled={u.deletion_pending || deletingId === u.id || savingChannels.has(u.id)}
                       inputProps={{ "aria-label": `${t("vpnUsers.updateChannel")}: ${u.username}` }}
                       onClick={(e) => e.stopPropagation()}
                       onMouseDown={(e) => e.stopPropagation()}
@@ -565,9 +608,9 @@ export default function VpnUsersTab({ isSuperadmin }: { isSuperadmin: boolean })
                   <TableCell>
                     <Chip
                       size="small"
-                      color={u.enabled ? "success" : "default"}
+                      color={u.deletion_pending ? "warning" : u.enabled ? "success" : "default"}
                       variant={u.enabled ? "filled" : "outlined"}
-                      label={u.enabled ? t("vpnUsers.filterEnabled") : t("vpnUsers.filterDisabled")}
+                      label={u.deletion_pending ? t("vpnUsers.deletionPending") : u.enabled ? t("vpnUsers.filterEnabled") : t("vpnUsers.filterDisabled")}
                     />
                   </TableCell>
 
@@ -597,7 +640,7 @@ export default function VpnUsersTab({ isSuperadmin }: { isSuperadmin: boolean })
                           <span>
                             <IconButton
                               size="small"
-                              disabled={busy === key}
+                              disabled={u.deletion_pending || deletingId === u.id || busy === key}
                               onClick={() => (cell ? setRevoking({ user: u, server: s }) : grant(u, s, {}))}
                             >
                               {cell
@@ -611,7 +654,7 @@ export default function VpnUsersTab({ isSuperadmin }: { isSuperadmin: boolean })
                           <span>
                             <IconButton
                               size="small"
-                              disabled={!cell || busy === key}
+                              disabled={u.deletion_pending || deletingId === u.id || !cell || busy === key}
                               onClick={() => cell && grant(u, s, { lan_access: !cell.lan_access })}
                             >
                               {cell?.lan_access
@@ -627,7 +670,7 @@ export default function VpnUsersTab({ isSuperadmin }: { isSuperadmin: boolean })
                               size="small"
                               aria-label={t("vpnUsers.allowSmartTest")}
                               aria-pressed={cell?.allow_smart_test ?? false}
-                              disabled={!cell || busy === key}
+                              disabled={u.deletion_pending || deletingId === u.id || !cell || busy === key}
                               onClick={() => cell && grant(u, s, { allow_smart_test: !cell.allow_smart_test })}
                             >
                               <ScienceIcon fontSize="small" color={cell?.allow_smart_test ? "primary" : "disabled"} />
@@ -648,7 +691,7 @@ export default function VpnUsersTab({ isSuperadmin }: { isSuperadmin: boolean })
                           <span>
                             <IconButton
                               size="small"
-                              disabled={!cell || published.length === 0 || busy === key}
+                              disabled={u.deletion_pending || deletingId === u.id || !cell || published.length === 0 || busy === key}
                               onClick={() => {
                                 if (!cell) return;
                                 if (published.length !== 1) return setDialogUser(u);
@@ -714,6 +757,24 @@ export default function VpnUsersTab({ isSuperadmin }: { isSuperadmin: boolean })
           onConfirm={confirmRevoke}
         />
       )}
+
+      <Dialog open={deleting !== null} onClose={() => { if (!deleteRequest.current) setDeleting(null); }}
+        aria-labelledby="delete-user-title" aria-describedby="delete-user-body" maxWidth="xs" fullWidth>
+        <DialogTitle id="delete-user-title">{t("vpnUsers.deleteTitle")}</DialogTitle>
+        <DialogContent sx={{ overflowWrap: "anywhere" }}>
+          <Typography id="delete-user-body" sx={{ mb: 2 }}>
+            {t("vpnUsers.deleteBody", { username: deleting?.username })}
+          </Typography>
+          <Alert severity="warning">{t("vpnUsers.deleteWarning")}</Alert>
+        </DialogContent>
+        <DialogActions sx={{ p: 2, gap: 1, flexWrap: "wrap" }}>
+          <Button disabled={deletingId !== null} onClick={() => setDeleting(null)}>{t("common.cancel")}</Button>
+          <Button color="error" variant="contained" disabled={deletingId !== null} onClick={confirmDelete}>
+            {deletingId !== null && <CircularProgress size={16} color="inherit" sx={{ mr: 1 }} />}
+            {t("vpnUsers.deleteTitle")}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Snackbar
         open={Boolean(snack)}

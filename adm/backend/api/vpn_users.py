@@ -35,6 +35,7 @@ from core.db import (
     get_vpn_user_by_username,
     mark_access_pending_delete,
     mark_all_access_pending,
+    request_vpn_user_deletion,
     update_vpn_user,
     upsert_user_access,
 )
@@ -48,7 +49,7 @@ from core.authz import (
 )
 from core.vpn_user_import import apply_import, build_preview
 from core.proxima_client import SiteGate
-from core.vpn_user_sync import reconcile_passwords, sync_pending
+from core.vpn_user_sync import reconcile_passwords, sync_pending, user_sync_lock
 
 log = logging.getLogger("adm.vpn_users")
 bp = Blueprint("vpn_users", __name__)
@@ -75,6 +76,7 @@ def _public_user(user: dict, access: list[dict]) -> dict:
         "allow_pools": user.get("allow_pools") == 1,
         "full_name": user["full_name"],
         "enabled": bool(user["enabled"]),
+        "deletion_pending": bool(user.get("deletion_pending", 0)),
         "note": user["note"],
         "created_at": user["created_at"],
         "updated_at": user["updated_at"],
@@ -311,6 +313,8 @@ def edit_user(user_id: int):
         return jsonify({"ok": False, "error": "User not found"}), 404
     if not may_manage_user(user_id):
         return forbidden("This user also belongs to servers you do not manage")
+    if user.get("deletion_pending"):
+        return jsonify({"ok": False, "error": "User deletion is pending"}), 409
 
     body = request.get_json(silent=True) or {}
     updates: dict = {}
@@ -365,7 +369,8 @@ def edit_user(user_id: int):
     if not updates:
         return jsonify({"ok": False, "error": "No fields to update"}), 400
 
-    update_vpn_user(user_id, updates)
+    if not update_vpn_user(user_id, updates):
+        return jsonify({"ok": False, "error": "User deletion is pending"}), 409
 
     # Only fields the Proxima instances actually replicate need a re-push.
     # full_name and note are ADM-side bookkeeping.
@@ -375,7 +380,10 @@ def edit_user(user_id: int):
     log.info(f"[VPN-USERS] Updated central user '{user['username']}' "
              f"({', '.join(sorted(updates))})")
     sync = _push_now(user_id)
-    result = _public_user(get_vpn_user(user_id), get_user_access(user_id))
+    current = get_vpn_user(user_id)
+    if not current or current.get("deletion_pending"):
+        return jsonify({"ok": False, "error": "User deletion is pending"}), 409
+    result = _public_user(current, get_user_access(user_id))
     if new_password:
         result["password"] = new_password
     result["sync"] = sync
@@ -390,6 +398,8 @@ def set_password(user_id: int):
         return jsonify({"ok": False, "error": "User not found"}), 404
     if not may_manage_user(user_id):
         return forbidden("This user also belongs to servers you do not manage")
+    if user.get("deletion_pending"):
+        return jsonify({"ok": False, "error": "User deletion is pending"}), 409
 
     body = request.get_json(silent=True) or {}
     password = (body.get("password") or "").strip()
@@ -399,7 +409,8 @@ def set_password(user_id: int):
     if not password:
         password = gen_vpn_user_password()
 
-    update_vpn_user(user_id, {"password_hash": hash_password(password)})
+    if not update_vpn_user(user_id, {"password_hash": hash_password(password)}):
+        return jsonify({"ok": False, "error": "User deletion is pending"}), 409
     mark_all_access_pending(user_id)
 
     log.info(f"[VPN-USERS] Password changed for '{user['username']}'")
@@ -409,17 +420,25 @@ def set_password(user_id: int):
 
 @bp.delete("/api/vpn-users/<int:user_id>")
 def remove_user(user_id: int):
-    """Delete a user. Refused while the user is still authorized anywhere.
+    """Delete an unassigned user, or explicitly queue whole-account deletion.
 
-    Deleting here would cascade the access rows away and leave the remote
-    accounts (and their peers) stranded on the Proxima instances. Revoke each
-    server first, let the sync remove them, then delete.
+    Cascade retains identity and access rows until remote cleanup succeeds.
     """
     user = get_vpn_user(user_id)
     if not user:
         return jsonify({"ok": False, "error": "User not found"}), 404
     if not may_manage_user(user_id):
         return forbidden("This user also belongs to servers you do not manage")
+
+    if request.args.get("cascade", "").lower() == "true":
+        with user_sync_lock:
+            request_vpn_user_deletion(user_id)
+            sync = _push_now(user_id)
+            pending = get_vpn_user(user_id) is not None
+        return jsonify({"ok": True, "data": {
+            "pending_sync": pending,
+            "sync": sync,
+        }}), 202 if pending else 200
 
     access = get_user_access(user_id)
     if access:
@@ -431,6 +450,7 @@ def remove_user(user_id: int):
     log.info(f"[VPN-USERS] Deleted central user '{user['username']}'")
     return jsonify({"ok": True, "data": {
         "message": f"User {user['username']} deleted",
+        "pending_sync": False,
     }})
 
 
@@ -501,13 +521,16 @@ def import_apply():
 @bp.put("/api/vpn-users/<int:user_id>/access/<int:vpn_server_id>")
 def grant_access(user_id: int, vpn_server_id: int):
     """Authorize a user on a server, or update the per-server limits."""
-    if not get_vpn_user(user_id):
+    user = get_vpn_user(user_id)
+    if not user:
         return jsonify({"ok": False, "error": "User not found"}), 404
     server = get_vpn_server(vpn_server_id)
     if not server:
         return jsonify({"ok": False, "error": "VPN server not found"}), 404
     if not may_manage_server(vpn_server_id):
         return forbidden()
+    if user.get("deletion_pending"):
+        return jsonify({"ok": False, "error": "User deletion is pending"}), 409
 
     data, err = _parse_access_body(request.get_json(silent=True) or {})
     if err:
@@ -519,7 +542,8 @@ def grant_access(user_id: int, vpn_server_id: int):
     if "max_peers" not in data and not get_access(user_id, vpn_server_id):
         data["max_peers"] = DEFAULT_MAX_PEERS
 
-    upsert_user_access(user_id, vpn_server_id, data)
+    if upsert_user_access(user_id, vpn_server_id, data) is None:
+        return jsonify({"ok": False, "error": "User deletion is pending"}), 409
     sync = _push_now(user_id)
     access = get_access(user_id, vpn_server_id)
     if not access:  # pushed and then removed (revoke raced) — nothing to show

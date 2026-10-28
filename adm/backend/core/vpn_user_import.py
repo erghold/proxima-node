@@ -94,6 +94,8 @@ def build_preview() -> dict:
     for username, sources in sorted(by_username.items()):
         sources.sort(key=lambda s: s["vpn_server_id"])
         central = get_vpn_user_by_username(username)
+        if central and central.get("deletion_pending"):
+            continue
 
         # Same password everywhere? Only decidable when every server could
         # produce the plaintext; otherwise it stays unknown and the operator
@@ -184,6 +186,9 @@ def apply_import(selections: list[dict]) -> dict:
         )
 
         central = get_vpn_user_by_username(username)
+        if central and central.get("deletion_pending"):
+            skipped.append({"username": username, "reason": "user deletion is pending"})
+            continue
         if central:
             user_id = central["id"]
             linked.append(username)
@@ -217,6 +222,9 @@ def apply_import(selections: list[dict]) -> dict:
                 "assigned_groups": json.dumps(src["assigned_groups"]),
                 **{f: src[f] for f in LIMIT_FIELDS},
             })
+            if access_id is None:
+                skipped.append({"username": username, "reason": "user deletion is pending"})
+                continue
 
             # The remote row already matches the central record when it is the
             # primary, or when both plaintexts are known to be identical.

@@ -1,4 +1,11 @@
 {
+  "vpnUsers.deleteTitle": "Delete user",
+  "vpnUsers.deleteUser": "Delete {{username}}",
+  "vpnUsers.deleteBody": "Permanently delete {{username}} from ADM and all assigned sites, including their remote accounts and VPN peers/devices? This cannot be undone.",
+  "vpnUsers.deleteWarning": "The central account is disabled immediately. Offline sites keep their accounts and peers until they reconnect and deletion sync succeeds. The user remains marked as pending until every site is cleared.",
+  "vpnUsers.deletionPending": "Deletion pending",
+  "vpnUsers.deleteQueued": "Deletion queued; waiting for site synchronization.",
+  "vpnUsers.deleteDone": "User deleted.",
   "vpnUsers.syncedAssignments": "{{count}} synchronized assignments",
   "vpnUsers.offlineSitesWaiting": "Waiting for offline sites: {{servers}}. Other sites sync independently.",
   "vpnUsers.enablePoolBeta": "Enable pool beta",

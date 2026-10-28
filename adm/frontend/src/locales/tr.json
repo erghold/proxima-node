@@ -1,4 +1,11 @@
 {
+  "vpnUsers.deleteTitle": "Kullanıcıyı sil",
+  "vpnUsers.deleteUser": "{{username}} kullanıcısını sil",
+  "vpnUsers.deleteBody": "{{username}} ADM ve atandığı tüm sahalardan, uzak hesapları ve VPN eşleri/cihazları dahil kalıcı olarak silinsin mi? Bu işlem geri alınamaz.",
+  "vpnUsers.deleteWarning": "Merkezi hesap hemen devre dışı bırakılır. Çevrimdışı sahalardaki hesaplar ve eşler, bağlantı yeniden kurulup silme eşitlemesi başarılı olana kadar kalır. Tüm sahalar temizlenene kadar kullanıcı silinmeyi bekliyor olarak görünür.",
+  "vpnUsers.deletionPending": "Silinmeyi bekliyor",
+  "vpnUsers.deleteQueued": "Silme sıraya alındı; saha eşitlemesi bekleniyor.",
+  "vpnUsers.deleteDone": "Kullanıcı silindi.",
   "vpnUsers.syncedAssignments": "{{count}} eşitlenmiş atama",
   "vpnUsers.offlineSitesWaiting": "Çevrimdışı sunucular bekleniyor: {{servers}}. Diğer sunucular bağımsız olarak eşitlenir.",
   "vpnUsers.enablePoolBeta": "Havuz betasını etkinleştir",
