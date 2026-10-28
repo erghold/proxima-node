@@ -1,5 +1,14 @@
 # ADM continuity — start here
 
+## Dedicated ERG VLESS exit provisioning — 2026-10-29
+
+c594e9b is pushed/live as provisioning tooling. Existing clients/Reality keys are
+preserved; dedicated per-slot ERG credentials have protected backup/recovery and
+ERG-only IPv4 domain egress. Seventeen independent checks and actual Xray parser/
+Ansible runs passed. SITE migrated six exit slots; HOMELAB access remains blocked,
+and Hetzner public VLESS is excluded despite management-path success. No beta or
+paid resource. See `continuity/sessions/notes/2026-10-29-erg-exit-identities.md`.
+
 ## Starting from a copied folder
 
 ### Local Smart Test permission — 2026-10-27

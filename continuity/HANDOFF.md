@@ -1,5 +1,11 @@
 # ADM handoff — evidence and boundaries
 
+2026-10-29 authorized ERG outbound migration: provisioning c594e9b is pushed/live,
+with17 independent checks and actual Xray/Ansible validation. Dedicated identities
+preserve original clients/keys; ERG-only IPv4 resolution preserves legacy routing.
+Six SITE slots migrated; HOMELAB SSH remains blocked, Hetzner public VLESS excluded.
+No beta publication. See `sessions/notes/2026-10-29-erg-exit-identities.md`.
+
 Deployment follow-up2026-10-27: parent GO received after site enforcement/runtime
 verification. ADM dffa0f768ae7932cf8719bd25b14f494dd2dca05 deployed canonically,
 active/HTTP200; public+loopback index/three bundle hashes match. Service DB schema
