@@ -542,7 +542,14 @@ export default function VpnUsersTab({ isSuperadmin }: { isSuperadmin: boolean })
                       onMouseDown={(e) => e.stopPropagation()}
                       onKeyDown={(e) => e.stopPropagation()}
                       onChange={(e) => changeChannel(u, e.target.value as VpnUser["update_channel"])}
-                      sx={{ ...selectSx, minWidth: 112, flexShrink: 0 }}
+                      sx={{
+                        ...selectSx, minWidth: 112, flexShrink: 0,
+                        ...(u.update_channel === "beta" && {
+                          color: "warning.main", fontWeight: 600,
+                          "& .MuiOutlinedInput-notchedOutline": { borderColor: "warning.main" },
+                          "& .MuiSelect-icon": { color: "warning.main" },
+                        }),
+                      }}
                     >
                       <MenuItem value="stable">{t("vpnUsers.updateChannelStable")}</MenuItem>
                       <MenuItem value="beta">{t("vpnUsers.updateChannelBeta")}</MenuItem>
