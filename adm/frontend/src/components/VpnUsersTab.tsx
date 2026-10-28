@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert, Box, Button, Checkbox, Chip, CircularProgress, IconButton, ListItemIcon,
   ListItemText, MenuItem, Paper, Select, Snackbar, Table, TableBody, TableCell,
@@ -124,6 +124,8 @@ export default function VpnUsersTab({ isSuperadmin }: { isSuperadmin: boolean })
   const [summary, setSummary] = useState<SyncSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  const channelRequests = useRef(new Set<number>());
+  const [savingChannels, setSavingChannels] = useState(new Set<number>());
   const [dialogUser, setDialogUser] = useState<VpnUser | null | "new">(null);
   const [revoking, setRevoking] = useState<{ user: VpnUser; server: VpnServer } | null>(null);
   const [snack, setSnack] = useState<{ msg: string; error?: boolean; warn?: boolean } | null>(null);
@@ -253,6 +255,28 @@ export default function VpnUsersTab({ isSuperadmin }: { isSuperadmin: boolean })
     fetchAll();
   };
 
+  const changeChannel = async (user: VpnUser, channel: VpnUser["update_channel"]) => {
+    if (channel === user.update_channel || channelRequests.current.has(user.id)) return;
+    channelRequests.current.add(user.id);
+    setSavingChannels(new Set(channelRequests.current));
+    try {
+      const { data } = await api.put(`/vpn-users/${user.id}`, { update_channel: channel });
+      if (!data.ok) {
+        setSnack({ msg: data.error || t("vpnUsers.requestFailed"), error: true });
+        return;
+      }
+      setUsers((current) => current.map((u) => u.id === user.id ? data.data : u));
+      reportSync(data.data?.sync);
+      await fetchAll();
+    } catch (err: unknown) {
+      const message = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      setSnack({ msg: message || t("vpnUsers.requestFailed"), error: true });
+    } finally {
+      channelRequests.current.delete(user.id);
+      setSavingChannels(new Set(channelRequests.current));
+    }
+  };
+
   const confirmRevoke = async () => {
     if (!revoking) return;
     const { user, server } = revoking;
@@ -314,6 +338,10 @@ export default function VpnUsersTab({ isSuperadmin }: { isSuperadmin: boolean })
           </Button>
         )}
         <Box sx={{ flexGrow: 1 }} />
+        {summary && (
+          <Chip size="small" color={summary.synced ? "success" : "default"} variant="outlined"
+            label={t("vpnUsers.syncedAssignments", { count: summary.synced })} />
+        )}
         {waiting > 0 && (
           <Chip size="small" color="warning" label={t("vpnUsers.waiting", { count: waiting })} />
         )}
@@ -335,6 +363,14 @@ export default function VpnUsersTab({ isSuperadmin }: { isSuperadmin: boolean })
         </Button>
       </Box>
 
+      {summary?.deferred?.length ? (
+        <Alert severity="warning" sx={{ mb: 2, "& .MuiAlert-message": { minWidth: 0, overflowWrap: "anywhere" } }}>
+          {t("vpnUsers.offlineSitesWaiting", {
+            servers: [...new Set(summary.deferred.map((e) => e.server_name))].join(", "),
+          })}
+        </Alert>
+      ) : null}
+
       {summary?.errors?.length ? (
         <Alert severity="error" sx={{ mb: 2, "& .MuiAlert-message": { minWidth: 0, overflowWrap: "anywhere" } }}>
           {summary.errors.map((e) => `${e.username}@${e.server_name}: ${e.sync_error}`).join(" · ")}
@@ -344,12 +380,12 @@ export default function VpnUsersTab({ isSuperadmin }: { isSuperadmin: boolean })
       {servers.length === 0 ? (
         <Typography color="text.secondary">{t("dashboard.noVpnServers")}</Typography>
       ) : (
-        <TableContainer component={Paper} sx={{ overflowX: "auto", border: 1, borderColor: "divider", scrollPaddingLeft: 240 }}>
+        <TableContainer component={Paper} sx={{ overflowX: "auto", border: 1, borderColor: "divider", scrollPaddingLeft: 300 }}>
           <Table
             size="small"
             stickyHeader
             sx={{
-              minWidth: 400 + servers.length * 220,
+              minWidth: 460 + servers.length * 220,
               "& th:first-of-type, & td:first-of-type": {
                 position: "sticky", left: 0, zIndex: 1, bgcolor: "background.paper",
                 borderRight: 1, borderRightColor: "divider",
@@ -360,7 +396,7 @@ export default function VpnUsersTab({ isSuperadmin }: { isSuperadmin: boolean })
           >
             <TableHead>
               <TableRow>
-                <TableCell sx={{ minWidth: 240, width: 240 }}>
+                <TableCell sx={{ minWidth: 300, width: 300 }}>
                   <TableSortLabel
                     active={sortKey === "username"}
                     direction={sortKey === "username" ? sortDir : "asc"}
@@ -484,16 +520,33 @@ export default function VpnUsersTab({ isSuperadmin }: { isSuperadmin: boolean })
               {visible.map((u) => (
                 <TableRow key={u.id} hover>
                   <TableCell>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0 }}>
                     <Box
                       component="button"
                       onClick={() => setDialogUser(u)}
+                      disabled={savingChannels.has(u.id)}
                       sx={{
                         background: "none", border: 0, p: 0, cursor: "pointer",
                         color: "primary.main", textAlign: "left", font: "inherit",
-                        maxWidth: 208, overflowWrap: "anywhere", fontWeight: 600,
+                        minWidth: 0, flex: "1 1 auto", maxWidth: 208, overflowWrap: "anywhere", fontWeight: 600,
                       }}
                     >
                       {u.username}
+                    </Box>
+                    <Select
+                      size="small"
+                      value={u.update_channel}
+                      disabled={savingChannels.has(u.id)}
+                      inputProps={{ "aria-label": `${t("vpnUsers.updateChannel")}: ${u.username}` }}
+                      onClick={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => e.stopPropagation()}
+                      onChange={(e) => changeChannel(u, e.target.value as VpnUser["update_channel"])}
+                      sx={{ ...selectSx, minWidth: 112, flexShrink: 0 }}
+                    >
+                      <MenuItem value="stable">{t("vpnUsers.updateChannelStable")}</MenuItem>
+                      <MenuItem value="beta">{t("vpnUsers.updateChannelBeta")}</MenuItem>
+                    </Select>
                     </Box>
                     {u.full_name && (
                       <Typography variant="caption" sx={{ display: "block", maxWidth: 208, overflowWrap: "anywhere", color: "text.secondary" }}>

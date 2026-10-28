@@ -1,4 +1,6 @@
 {
+  "vpnUsers.syncedAssignments": "Синхронизировано назначений: {{count}}",
+  "vpnUsers.offlineSitesWaiting": "Ожидание недоступных серверов: {{servers}}. Остальные серверы синхронизируются независимо.",
   "vpnUsers.enablePoolBeta": "Включить бета-версию пулов",
   "vpnUsers.updateChannel": "Канал обновлений клиента",
   "vpnUsers.updateChannelHelp": "Задаётся администратором для всех сайтов. Не зависит от Smart Test; пользователь не может изменить его.",

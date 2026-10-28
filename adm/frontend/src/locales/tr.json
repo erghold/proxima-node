@@ -1,4 +1,6 @@
 {
+  "vpnUsers.syncedAssignments": "{{count}} eşitlenmiş atama",
+  "vpnUsers.offlineSitesWaiting": "Çevrimdışı sunucular bekleniyor: {{servers}}. Diğer sunucular bağımsız olarak eşitlenir.",
   "vpnUsers.enablePoolBeta": "Havuz betasını etkinleştir",
   "vpnUsers.updateChannel": "İstemci güncelleme kanalı",
   "vpnUsers.updateChannelHelp": "Tüm siteler için yönetici belirler. Smart Test'ten bağımsızdır; kullanıcı değiştiremez.",

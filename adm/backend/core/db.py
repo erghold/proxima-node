@@ -1379,11 +1379,8 @@ def mark_access_error(access_id: int, error: str) -> None:
 
 
 def get_sync_summary() -> dict:
-    """Counts per sync state, plus the rows whose last push failed.
-
-    'error' is not a status but an attribute of a still-pending row, so it is
-    counted from sync_error rather than from sync_status.
-    """
+    """Keep queued unreachable sites separate from actual rejected changes."""
+    from core.proxima_client import waiting_note
     conn = get_conn()
     counts = {
         r["sync_status"]: r["cnt"]
@@ -1392,7 +1389,7 @@ def get_sync_summary() -> dict:
             "GROUP BY sync_status"
         ).fetchall()
     }
-    errors = [dict(r) for r in conn.execute(
+    issues = [dict(r) for r in conn.execute(
         "SELECT u.username, s.name AS server_name, a.sync_error "
         "FROM vpn_user_access a "
         "JOIN vpn_users u ON a.user_id = u.id "
@@ -1400,12 +1397,15 @@ def get_sync_summary() -> dict:
         "WHERE a.sync_error IS NOT NULL AND a.sync_status != 'synced' "
         "ORDER BY u.username"
     ).fetchall()]
+    deferred = [r for r in issues if r["sync_error"].startswith(waiting_note(""))]
+    errors = [r for r in issues if not r["sync_error"].startswith(waiting_note(""))]
     return {
         "synced": counts.get("synced", 0),
         "pending": counts.get("pending", 0),
         "pending_delete": counts.get("pending_delete", 0),
         "error": len(errors),
         "errors": errors,
+        "deferred": deferred,
     }
 
 

@@ -1,4 +1,6 @@
 {
+  "vpnUsers.syncedAssignments": "{{count}} synchronized assignments",
+  "vpnUsers.offlineSitesWaiting": "Waiting for offline sites: {{servers}}. Other sites sync independently.",
   "vpnUsers.enablePoolBeta": "Enable pool beta",
   "vpnUsers.updateChannel": "Client update channel",
   "vpnUsers.updateChannelHelp": "Admin-managed for all sites. Independent of Smart Test; users cannot change it.",
