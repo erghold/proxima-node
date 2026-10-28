@@ -66,6 +66,7 @@ def restart():
 
 def plan(raw, keys_raw, label, server):
     config = json.loads(raw)
+    before = encode(config)
     keys = json.loads(keys_raw)
     matches = [i for i in config["inbounds"] if i.get("protocol") == "vless"
                and i.get("streamSettings", {}).get("security") == "reality"]
@@ -93,11 +94,54 @@ def plan(raw, keys_raw, label, server):
                           "flow": "xtls-rprx-vision"}
     if not existing:
         clients.append(client)
+
+    # A first-match user rule changes only our identities, not the default exit.
+    erg_labels = sorted(c["email"] for c in clients
+                        if re.fullmatch(r"erg-slot-[1-9][0-9]*", c.get("email", "")))
+    for other in config["inbounds"]:
+        if other is not inbound and any(
+                c.get("email") in erg_labels for c in other.get("settings", {}).get("clients", [])):
+            raise ValueError("ERG email also belongs to another inbound")
+    outbound = {"tag": "erg-ipv4", "protocol": "freedom",
+                "settings": {"domainStrategy": "UseIPv4"}}
+    outbounds = config["outbounds"]
+    if not isinstance(outbounds, list) or not outbounds:
+        raise ValueError("Existing default outbound required")
+    tagged = [o for o in outbounds if o.get("tag") == "erg-ipv4"]
+    if tagged and tagged != [outbound]:
+        raise ValueError("Conflicting ERG outbound tag")
+    routing = config.setdefault("routing", {})
+    rules = routing.setdefault("rules", [])
+    managed = [r for r in rules if r.get("outboundTag") == "erg-ipv4"]
+    if managed:
+        rule = managed[0]
+        users = rule.get("user", [])
+        if (len(managed) != 1 or rules[0] is not rule
+                or set(rule) != {"type", "user", "outboundTag"}
+                or rule.get("type") != "field" or not isinstance(users, list)
+                or not users or any(u not in erg_labels for u in users)
+                or len(users) != len(set(users))):
+            raise ValueError("Conflicting ERG routing rule")
+    for rule in rules:
+        if rule not in managed and any(u in erg_labels for u in rule.get("user", [])):
+            raise ValueError("ERG identity already has another routing rule")
+    for balancer in routing.get("balancers", []):
+        if any("erg-ipv4".startswith(prefix) for prefix in balancer.get("selector", [])):
+            raise ValueError("ERG outbound would affect an existing balancer")
+    if not tagged:
+        outbounds.append(outbound)
+    erg_rule = {"type": "field", "user": erg_labels, "outboundTag": "erg-ipv4"}
+    if managed:
+        rules[0] = erg_rule
+    else:
+        rules.insert(0, erg_rule)
+
     profile = {"server": server, "port": inbound["port"], "uuid": client["id"],
                "public_key": keys["public_key"], "short_id": keys["short_id"],
                "sni": reality["serverNames"][0], "flow": client["flow"],
                "fingerprint": "chrome", "email": label}
-    return (encode(config) if not existing else raw), profile
+    after = encode(config)
+    return (after if after != before else raw), profile
 
 
 def recover(directory, restart_service=restart):

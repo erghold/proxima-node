@@ -18,13 +18,28 @@ reuses only that label's identity; a new label generates a new UUID. Do not rena
 labels between retries. The endpoint is supplied explicitly, not the management
 address. The playbook uses `/opt/xray-reality` and does not fetch credentials.
 
+Each invocation also routes all provisioned `erg-slot-N` emails on that listener
+through a dedicated `erg-ipv4` freedom outbound with `domainStrategy: UseIPv4`.
+A first-match `user` rule lists each ERG email once; original outbounds (including
+the default), original rules in their original relative order, Reality destination,
+and non-ERG clients are unchanged. Existing ERG identities/profiles are not rotated:
+rerun the same invocation to upgrade already provisioned clients. The first upgrade
+changes configuration and restarts Xray; subsequent identical runs do not.
+
+Conflicting `erg-ipv4` tags/rules, other explicit rules for ERG emails, matching
+legacy balancer selectors, and cross-inbound email collisions are rejected rather
+than overwritten. The label namespace is reserved for provisioned ERG identities.
+`UseIPv4` selects IPv4 for domain resolution; it is not an IPv6-literal firewall.
+The parent must validate the candidate with the installed parser and repeat
+domain-based IPv4 egress probes before rollout. No global DNS strategy is changed.
+
 Output: root-only `client-profiles/erg-slot-6.json` under `/opt/xray-reality`,
 containing server, port, uuid, public_key, short_id, sni, flow, fingerprint, email.
 Transfer privately; never print, attach to tracker, or put in Git. The JSON is an
 interchange profile; the migration owner maps it into Proxima's tunnel schema.
 
 The helper validates a protected staged config with the exact installed
-`xray run -test -config FILE`, retains a root-only `config.backup-*`, atomically
+`xray run -test -format json -config FILE`, retains a root-only `config.backup-*`, atomically
 replaces the config, restarts `xray-reality`, waits two seconds and checks active.
 Existing clients, other settings, keys.json and listener port are retained.
 Idempotent runs validate but do not restart. **A changed run briefly interrupts

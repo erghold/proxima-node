@@ -27,7 +27,13 @@ class ProvisionTests(unittest.TestCase):
                          "streamSettings": {"network": "tcp", "security": "reality",
                             "realitySettings": {"privateKey": "test-private",
                                 "shortIds": ["abcd"], "serverNames": ["example.org"]}}}],
-                       "outbounds": [{"protocol": "freedom"}]}
+                       "outbounds": [{"protocol": "freedom", "tag": "direct"},
+                                     {"protocol": "blackhole", "tag": "blocked"}],
+                       "routing": {"domainStrategy": "AsIs", "rules": [
+                           {"type": "field", "user": ["existing"], "outboundTag": "direct"},
+                           {"type": "field", "domain": ["example.net"], "outboundTag": "blocked"},
+                           {"type": "field", "port": "0-65535", "outboundTag": "direct"},
+                       ]}}
         self.keys = {"private_key": "test-private", "public_key": "test-public",
                      "short_id": "abcd"}
         self.original = mod.encode(self.config)
@@ -47,6 +53,10 @@ class ProvisionTests(unittest.TestCase):
         self.assertTrue(self.provision())
         after = json.loads(self.current())
         client = after["inbounds"][0]["settings"]["clients"].pop()
+        self.assertEqual(after["outbounds"].pop(), {
+            "tag": "erg-ipv4", "protocol": "freedom", "settings": {"domainStrategy": "UseIPv4"}})
+        self.assertEqual(after["routing"]["rules"].pop(0), {
+            "type": "field", "user": ["erg-slot-6"], "outboundTag": "erg-ipv4"})
         self.assertEqual(after, self.config)
         self.assertNotEqual(client["id"], self.config["inbounds"][0]["settings"]["clients"][0]["id"])
         self.assertEqual((self.directory / "keys.json").read_bytes(), mod.encode(self.keys))
@@ -65,6 +75,86 @@ class ProvisionTests(unittest.TestCase):
         mod.provision(self.directory, "erg-slot-7", "exit.example.org", self.validator, self.restart)
         clients = json.loads(self.current())["inbounds"][0]["settings"]["clients"]
         self.assertEqual(len({c["id"] for c in clients}), 3)
+        self.assertEqual(json.loads(self.current())["routing"]["rules"][0]["user"],
+                         ["erg-slot-6", "erg-slot-7"])
+        self.assertFalse(self.provision())
+
+    def test_existing_client_gets_route_without_identity_or_profile_change(self):
+        client = {"id": "00000000-0000-4000-8000-000000000006",
+                  "email": "erg-slot-6", "flow": "xtls-rprx-vision"}
+        self.config["inbounds"][0]["settings"]["clients"].append(client)
+        old = mod.encode(self.config)
+        (self.directory / "config.json").write_bytes(old)
+        _, profile = mod.plan(old, mod.encode(self.keys), "erg-slot-6", "exit.example.org")
+        profiles = self.directory / "client-profiles"
+        profiles.mkdir()
+        profile_path = profiles / "erg-slot-6.json"
+        profile_bytes = json.dumps(profile).encode()
+        profile_path.write_bytes(profile_bytes)
+        self.assertTrue(self.provision())
+        after = json.loads(self.current())
+        self.assertEqual(after["inbounds"], self.config["inbounds"])
+        self.assertEqual(after["outbounds"][:-1], self.config["outbounds"])
+        self.assertEqual(after["routing"]["rules"][1:], self.config["routing"]["rules"])
+        self.assertEqual(profile_path.read_bytes(), profile_bytes)
+        self.assertFalse(self.provision())
+        self.restart.assert_called_once()
+
+    def test_conflicting_tags_and_rules_are_rejected_before_deployment(self):
+        outbound = {"tag": "erg-ipv4", "protocol": "freedom",
+                    "settings": {"domainStrategy": "UseIPv4"}}
+        good_rule = {"type": "field", "user": ["erg-slot-6"], "outboundTag": "erg-ipv4"}
+        conflicts = []
+        config = copy.deepcopy(self.config)
+        config["outbounds"].append({**outbound, "settings": {"domainStrategy": "AsIs"}})
+        conflicts.append(config)
+        config = copy.deepcopy(self.config)
+        config["outbounds"].extend([outbound, outbound])
+        conflicts.append(config)
+        for rule in (
+            {**good_rule, "user": ["existing"]},
+            {**good_rule, "user": ["erg-slot-6", "erg-slot-6"]},
+            {**good_rule, "user": ["erg-slot-99"]},
+            {**good_rule, "port": "443"},
+            {**good_rule, "outboundTag": "direct"},
+        ):
+            config = copy.deepcopy(self.config)
+            config["routing"]["rules"].insert(0, rule)
+            conflicts.append(config)
+        config = copy.deepcopy(self.config)
+        config["routing"]["rules"].append(good_rule)
+        conflicts.append(config)
+        config = copy.deepcopy(self.config)
+        config["routing"]["balancers"] = [{"tag": "legacy", "selector": ["erg"]}]
+        conflicts.append(config)
+        for config in conflicts:
+            with self.subTest(config=config):
+                raw = mod.encode(config)
+                (self.directory / "config.json").write_bytes(raw)
+                with self.assertRaises(ValueError):
+                    self.provision()
+                self.assertEqual(self.current(), raw)
+        self.validator.assert_not_called()
+        self.restart.assert_not_called()
+
+    def test_no_existing_routing_and_noncanonical_json_are_idempotent(self):
+        del self.config["routing"]
+        candidate, profile = mod.plan(mod.encode(self.config), mod.encode(self.keys), "erg-slot-6", "exit.example.org")
+        compact = json.dumps(json.loads(candidate)).encode()
+        again, same_profile = mod.plan(compact, mod.encode(self.keys), "erg-slot-6", "exit.example.org")
+        self.assertEqual(again, compact)
+        self.assertEqual(profile, same_profile)
+
+    def test_empty_default_or_cross_inbound_email_cannot_affect_legacy_clients(self):
+        config = copy.deepcopy(self.config)
+        config["outbounds"] = []
+        with self.assertRaises(ValueError):
+            mod.plan(mod.encode(config), mod.encode(self.keys), "erg-slot-6", "exit.example.org")
+        config = copy.deepcopy(self.config)
+        config["inbounds"].append({"protocol": "vmess", "settings": {"clients": [
+            {"email": "erg-slot-6", "id": "00000000-0000-4000-8000-000000000002"}]}})
+        with self.assertRaises(ValueError):
+            mod.plan(mod.encode(config), mod.encode(self.keys), "erg-slot-6", "exit.example.org")
 
     def test_parser_rejection_never_deploys(self):
         self.validator.side_effect = RuntimeError("invalid config")
