@@ -52,7 +52,7 @@ class ProvisionTests(unittest.TestCase):
         self.assertEqual((self.directory / "keys.json").read_bytes(), mod.encode(self.keys))
         self.assertFalse(self.provision())
         self.restart.assert_called_once()
-        self.assertEqual(self.validator.call_args.args[0][1:4], ["run", "-test", "-config"])
+        self.assertEqual(self.validator.call_args.args[0][1:6], ["run", "-test", "-format", "json", "-config"])
         backup, = self.directory.glob("config.backup-*")
         self.assertEqual(backup.read_bytes(), self.original)
         profile = self.directory / "client-profiles/erg-slot-6.json"

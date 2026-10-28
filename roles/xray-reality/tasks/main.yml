@@ -152,7 +152,7 @@
     group: root
     mode: "0600"
     force: false
-    validate: "{{ xray_dir }}/xray run -test -config %s"
+    validate: "{{ xray_dir }}/xray run -test -format json -config %s"
   when: not xray_existing_config.stat.exists
   no_log: true
   notify: restart xray-reality

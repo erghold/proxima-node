@@ -136,7 +136,7 @@ def provision(directory, label, server, validator=run, restart_service=restart):
         os.chmod(output, 0o600)
     staged = private_file(directory, candidate, ".candidate-")
     try:
-        validator([str(directory / "xray"), "run", "-test", "-config", str(staged)])
+        validator([str(directory / "xray"), "run", "-test", "-format", "json", "-config", str(staged)])
         if read(config_path) != old or read(keys_path) != keys:
             raise ValueError("External edit detected before deployment")
         if candidate != old:
