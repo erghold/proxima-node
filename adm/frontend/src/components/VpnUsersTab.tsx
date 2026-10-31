@@ -638,6 +638,7 @@ export default function VpnUsersTab({ isSuperadmin }: { isSuperadmin: boolean })
 
       {dialogUser !== null && (
         <VpnUserDialog
+          isSuperadmin={isSuperadmin}
           user={dialogUser === "new" ? null : dialogUser}
           servers={servers}
           onClose={() => setDialogUser(null)}

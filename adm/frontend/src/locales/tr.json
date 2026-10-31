@@ -1,4 +1,17 @@
 {
+  "pools": {
+    "title": "Havuzlar", "create": "Havuz oluştur", "edit": "Havuzu düzenle", "label": "Ad", "kind": "Amaç",
+    "smart": "Akıllı", "lan_only": "Yalnızca LAN", "full_tunnel": "Tam tünel", "enabled": "Etkin", "disabled": "Devre dışı",
+    "site": "Site", "route": "Rota", "addMember": "Üye ekle", "up": "Yukarı taşı", "down": "Aşağı taşı", "remove": "Kaldır",
+    "grants": "Kullanıcı izinleri", "stale": "Güncel olmayan envanter", "unavailable": "Kullanılamıyor veya devre dışı", "policyOff": "Havuz erişim politikası kapalı",
+    "description": "Üyeler sırayla denenir. Site izinleri geçerliliğini korur. Yöneticiler eşdeğer yönlendirme politikalarını sağlamalıdır; geçiş oturumları yeniden bağlayabilir. Envanter trafik hazırlığını kanıtlamaz.",
+    "prerequisite": "İzinler açıkça verilir. VPN Kullanıcıları bölümünde havuz iznini ayrıca etkinleştirin; bu ekran politikayı etkinleştirmez veya site erişimi vermez. İstemcilere yalnızca izinli ve kullanılabilir rotalar iletilir."
+  },
+  "vpnUsers.enablePoolBeta": "Havuz betasını etkinleştir",
+  "vpnUsers.updateChannel": "İstemci güncelleme kanalı",
+  "vpnUsers.updateChannelHelp": "Tüm siteler için yönetici belirler. Smart Test'ten bağımsızdır; kullanıcı değiştiremez.",
+  "vpnUsers.updateChannelStable": "Kararlı",
+  "vpnUsers.updateChannelBeta": "Beta",
   "app.title": "Proxima ADM",
   "docs.title": "Dokümantasyon",
   "docs.notFound": "Doküman bulunamadı",

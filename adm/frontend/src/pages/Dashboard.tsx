@@ -19,6 +19,7 @@ import VpnServerDetailDialog from "../components/VpnServerDetailDialog";
 import EditServerDialog from "../components/EditServerDialog";
 import MonitoringTab from "../components/MonitoringTab";
 import VpnUsersTab from "../components/VpnUsersTab";
+import PoolsTab from "../components/PoolsTab";
 import OutputViewer from "../components/OutputViewer";
 
 export default function Dashboard({ role }: { role: AdminRole }) {
@@ -202,6 +203,7 @@ export default function Dashboard({ role }: { role: AdminRole }) {
         <Tab label={t("dashboard.tabVpnServers")} sx={{ display: isSuperadmin ? undefined : "none" }} />
         <Tab label={t("dashboard.tabUsers")} />
         <Tab label={t("dashboard.tabMonitoring")} sx={{ display: isSuperadmin ? undefined : "none" }} />
+        <Tab label={t("pools.title")} sx={{ display: isSuperadmin ? undefined : "none" }} />
       </Tabs>
 
       {/* ── Tab 0: Exit Servers ──────────────────── */}
@@ -370,6 +372,7 @@ export default function Dashboard({ role }: { role: AdminRole }) {
       {/* ── Tab 2: Monitoring ──────────────────────── */}
       {tab === 2 && <VpnUsersTab isSuperadmin={isSuperadmin} />}
       {tab === 3 && <MonitoringTab />}
+      {tab === 4 && isSuperadmin && <PoolsTab />}
     </Box>
   );
 }

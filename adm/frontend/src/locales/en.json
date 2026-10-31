@@ -1,4 +1,17 @@
 {
+  "pools": {
+    "title": "Pools", "create": "Create pool", "edit": "Edit pool", "label": "Name", "kind": "Purpose",
+    "smart": "Smart", "lan_only": "LAN Only", "full_tunnel": "Full tunnel", "enabled": "Enabled", "disabled": "Disabled",
+    "site": "Site", "route": "Route", "addMember": "Add member", "up": "Move up", "down": "Move down", "remove": "Remove",
+    "grants": "User grants", "stale": "Stale inventory", "unavailable": "Unavailable or disabled", "policyOff": "Pool access policy off",
+    "description": "Members are tried in order. Site permissions still apply. Administrators must ensure equivalent routing policies; failover can reconnect sessions. Inventory does not prove traffic readiness.",
+    "prerequisite": "Grants are explicit. Enable Allow pools separately in VPN Users; this screen never enables it or grants site access. Only currently authorized, available routes reach clients."
+  },
+  "vpnUsers.enablePoolBeta": "Enable pool beta",
+  "vpnUsers.updateChannel": "Client update channel",
+  "vpnUsers.updateChannelHelp": "Admin-managed for all sites. Independent of Smart Test; users cannot change it.",
+  "vpnUsers.updateChannelStable": "Stable",
+  "vpnUsers.updateChannelBeta": "Beta",
   "app.title": "Proxima ADM",
   "docs.title": "Documentation",
   "docs.notFound": "Document not found",
