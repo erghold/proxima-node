@@ -1,5 +1,13 @@
 # ADM handoff — evidence and boundaries
 
+## Upstream reconciled locally — 2026-10-31
+
+Integration branch `integrate/location-pools-20261031` includes fetched 7ac777d and
+the local v2 pool commits. Backend 372 passed; 8 companion-layout skips separately
+passed against the reconciled SITE. Production frontend build and 474-key locale
+parity passed. Original dirty main preserved; no push/deployment or live changes.
+See `sessions/notes/2026-10-31-pool-reconciliation.md` for evidence and worktree path.
+
 ## Local pool commits — 2026-10-31
 
 User approved local commits only. d61b23c (backend/catalog and dependencies) and
@@ -8,6 +16,12 @@ index snapshot20 catalog tests passed; broad transport run timed out, not a pass
 No live changes. Local branch diverges from the already-fetched upstream by9
 upstream-only commits; reconcile before push/deploy. Infrastructure experiments
 remain dirty. See sessions/notes/2026-10-31-local-pool-commits.md.
+
+2026-10-29 authorized ERG outbound migration: provisioning c594e9b is pushed/live,
+with17 independent checks and actual Xray/Ansible validation. Dedicated identities
+preserve original clients/keys; ERG-only IPv4 resolution preserves legacy routing.
+Six SITE slots migrated; HOMELAB SSH remains blocked, Hetzner public VLESS excluded.
+No beta publication. See `sessions/notes/2026-10-29-erg-exit-identities.md`.
 
 Deployment follow-up2026-10-27: parent GO received after site enforcement/runtime
 verification. ADM dffa0f768ae7932cf8719bd25b14f494dd2dca05 deployed canonically,

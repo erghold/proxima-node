@@ -366,6 +366,7 @@ export interface ServerProfiles {
 }
 
 export interface VpnUser {
+  deletion_pending: boolean;
   allow_pools: boolean;
   update_channel: "stable" | "beta";
   id: number;
@@ -396,6 +397,7 @@ export interface SyncSummary {
   pending_delete: number;
   error: number;
   errors: { username: string; server_name: string; sync_error: string }[];
+  deferred: { username: string; server_name: string; sync_error: string }[];
 }
 
 /** One range already spoken for, shown so the next one is picked knowingly. */

@@ -22,6 +22,7 @@ goes on to the sites that are up. See SiteGate.
 
 import json
 import logging
+import threading
 
 from core.db import (
     delete_user_access,
@@ -36,6 +37,9 @@ from core.db import (
 from core.proxima_client import SiteGate, waiting_note
 
 log = logging.getLogger("adm.vpn_user_sync")
+
+# Serialize replica pushes and whole-account deletion in ADM's single process.
+user_sync_lock = threading.RLock()
 
 
 def _remote_payload(row: dict) -> dict:
@@ -254,6 +258,8 @@ def reconcile_passwords() -> dict:
     propagated, skipped = [], []
 
     for user in get_all_vpn_users():
+        if user.get("deletion_pending"):
+            continue
         present = [
             (a, remote[a["vpn_server_id"]][user["username"]])
             for a in get_user_access(user["id"])
@@ -316,6 +322,14 @@ def sync_pending(vpn_server_id: int | None = None,
                  user_id: int | None = None,
                  allowed_server_ids: list[int] | None = None,
                  gate: SiteGate | None = None) -> dict:
+    with user_sync_lock:
+        return _sync_pending(vpn_server_id, user_id, allowed_server_ids, gate)
+
+
+def _sync_pending(vpn_server_id: int | None = None,
+                  user_id: int | None = None,
+                  allowed_server_ids: list[int] | None = None,
+                  gate: SiteGate | None = None) -> dict:
     """Reconcile pending rows, optionally narrowed to a server or user.
 
     allowed_server_ids confines the push to what the caller is entitled to

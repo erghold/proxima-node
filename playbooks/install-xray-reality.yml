@@ -20,21 +20,13 @@
       register: xray_status
       changed_when: false
 
-    - name: Read VLESS keys
-      ansible.builtin.slurp:
-        src: /opt/xray-reality/keys.json
-      register: final_keys
-
-    - name: Display VLESS info
+    - name: Display service status
       ansible.builtin.debug:
         msg: |
           VLESS Reality deployed on {{ inventory_hostname }}
           ─────────────────────────────────────────
           Status:     {{ xray_status.stdout }}
           Port:       {{ vless_port }}
-          UUID:       {{ (final_keys.content | b64decode | from_json).uuid }}
-          Public Key: {{ (final_keys.content | b64decode | from_json).public_key }}
-          Short ID:   {{ (final_keys.content | b64decode | from_json).short_id }}
           SNI:        {{ vless_reality_sni }}
           ─────────────────────────────────────────
       tags: [always]

@@ -1,5 +1,15 @@
 # ADM continuity — start here
 
+## Local upstream reconciliation — 2026-10-31
+
+Can authorized local reconciliation. Integration branch
+`integrate/location-pools-20261031` combines local pool commits with fetched
+`origin/main` 7ac777d in an isolated worktree, preserving the original dirty main.
+Conflicts retain v2 catalog/authorization and upstream pending-deletion migration,
+types, user-management behavior and locale strings. Verification and final status:
+`continuity/sessions/notes/2026-10-31-pool-reconciliation.md`.
+No publication, deployment, live grants or Windows service transition authorized.
+
 ## Local pool commits — 2026-10-31
 
 Can authorized local commits only. d61b23c records v2 catalogs/authorized sync plus
@@ -10,6 +20,15 @@ Provisioning/watchdog/strategy work remains preserved and uncommitted. No push o
 deployment. Existing upstream ref has9 commits absent locally; reconcile before
 publication rather than overwriting newer deployed history. See
 `continuity/sessions/notes/2026-10-31-local-pool-commits.md`.
+
+## Dedicated ERG VLESS exit provisioning — 2026-10-29
+
+c594e9b is pushed/live as provisioning tooling. Existing clients/Reality keys are
+preserved; dedicated per-slot ERG credentials have protected backup/recovery and
+ERG-only IPv4 domain egress. Seventeen independent checks and actual Xray parser/
+Ansible runs passed. SITE migrated six exit slots; HOMELAB access remains blocked,
+and Hetzner public VLESS is excluded despite management-path success. No beta or
+paid resource. See `continuity/sessions/notes/2026-10-29-erg-exit-identities.md`.
 
 ## Starting from a copied folder
 
