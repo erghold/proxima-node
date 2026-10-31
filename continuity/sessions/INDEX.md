@@ -44,3 +44,5 @@ Each entry is a separate snapshot, not the authoritative project backlog.
 - [2026-10-12-provisioning-setup](notes/2026-10-12-provisioning-setup.md)
 - [2026-10-13-update-output](notes/2026-10-13-update-output.md)
 - [2026-10-27-smart-test-grant](notes/2026-10-27-smart-test-grant.md)
+- [2026-10-30-location-pools](notes/2026-10-30-location-pools.md)
+- [2026-10-31-local-pool-commits](notes/2026-10-31-local-pool-commits.md)

@@ -1,5 +1,14 @@
 # ADM handoff — evidence and boundaries
 
+## Local pool commits — 2026-10-31
+
+User approved local commits only. d61b23c (backend/catalog and dependencies) and
+92e0f42 (management UI) preserve explicit grants and existing v1 records. Isolated
+index snapshot20 catalog tests passed; broad transport run timed out, not a pass.
+No live changes. Local branch diverges from the already-fetched upstream by9
+upstream-only commits; reconcile before push/deploy. Infrastructure experiments
+remain dirty. See sessions/notes/2026-10-31-local-pool-commits.md.
+
 Deployment follow-up2026-10-27: parent GO received after site enforcement/runtime
 verification. ADM dffa0f768ae7932cf8719bd25b14f494dd2dca05 deployed canonically,
 active/HTTP200; public+loopback index/three bundle hashes match. Service DB schema

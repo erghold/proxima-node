@@ -1,5 +1,16 @@
 # ADM continuity — start here
 
+## Local pool commits — 2026-10-31
+
+Can authorized local commits only. d61b23c records v2 catalogs/authorized sync plus
+required v1 identity/revocation dependencies;92e0f42 records pool management UI.
+An index-only backend snapshot passed20 location-pool cases. An initial broader
+transport run timed out at120s without reported assertions; not claimed as passing.
+Provisioning/watchdog/strategy work remains preserved and uncommitted. No push or
+deployment. Existing upstream ref has9 commits absent locally; reconcile before
+publication rather than overwriting newer deployed history. See
+`continuity/sessions/notes/2026-10-31-local-pool-commits.md`.
+
 ## Starting from a copied folder
 
 ### Local Smart Test permission — 2026-10-27
