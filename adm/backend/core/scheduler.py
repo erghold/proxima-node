@@ -51,12 +51,23 @@ def start_scheduler() -> None:
     """Start the background scheduler thread."""
     thread = threading.Thread(target=_loop, daemon=True, name="adm-scheduler")
     thread.start()
+    threading.Thread(target=_pool_delivery_loop, daemon=True, name="adm-pool-delivery").start()
     log.info(f"Scheduler started, interval: {POLL_INTERVAL}s")
 
 
 def stop_scheduler() -> None:
     """Signal the scheduler to stop."""
     _stop.set()
+
+
+def _pool_delivery_loop() -> None:
+    # Independent of metrics/password/legacy-user sync, which may wait on offline sites.
+    from core.pool_attachment_sync import reconcile
+    while not _stop.wait(timeout=60):
+        try:
+            reconcile(limit=10)
+        except Exception:
+            log.exception("Pool authorization delivery error")
 
 
 def _loop() -> None:
@@ -371,6 +382,7 @@ def _poll_vpn_server(server: dict) -> dict:
             if isinstance(cpu, dict) and "used_pct" in cpu:
                 result["cpu_pct"] = cpu["used_pct"]
             result["profiles"] = _published_profiles(data.get("data", {}))
+            result["routes"] = data.get("data", {}).get("pool_routes", [])
     except http_requests.exceptions.RequestException:
         pass
     except Exception:
@@ -405,7 +417,13 @@ def _collect_vpn_metrics() -> None:
         # Only refresh from a site that actually answered; a failed poll must
         # not erase profiles an admin is in the middle of granting.
         if metric.get("online") and "profiles" in metric:
-            set_server_profiles(server["id"], metric["profiles"])
+            set_server_profiles(server["id"], metric["profiles"], metric.get("routes", []))
+        else:
+            # Retain inventory for editing, but never advertise an observed outage as usable.
+            from core.db import get_conn
+            conn = get_conn()
+            conn.execute("UPDATE vpn_servers SET routes_cached_at=NULL WHERE id=?", (server["id"],))
+            conn.commit()
 
     log.info(
         f"Collected VPN metrics for {len(active)} server(s): "

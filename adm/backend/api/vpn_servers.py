@@ -1,6 +1,7 @@
 """VPN server management API — CRUD + generic Proxima proxy."""
 
 import logging
+import sqlite3
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import requests as http_requests
@@ -300,6 +301,15 @@ def delete_vpn_server_endpoint(vpn_server_id: int):
                         f"{authorized} VPN user(s) are still authorized on this "
                         "server — revoke their access first"}), 409
 
+    # The database guard is atomic with removal; never remove management access
+    # first when a concurrent attachment still needs its revocation delivered.
+    try:
+        delete_vpn_server(vpn_server_id)
+    except sqlite3.IntegrityError as exc:
+        if "pool_attachment_cleanup_required" not in str(exc):
+            raise
+        return jsonify({"ok": False, "error": "pool_attachment_cleanup_required"}), 409
+
     # Take it off the management network too. Leaving the peer would keep an
     # address allocated and a tunnel accepted for a site ADM no longer knows.
     from core.mgmt_network import forget_peer
@@ -310,7 +320,6 @@ def delete_vpn_server_endpoint(vpn_server_id: int):
                     f"management network: {e}")
 
     name = server["name"]
-    delete_vpn_server(vpn_server_id)
 
     # Otherwise the host stays in the inventory and its host_vars file — with
     # whatever credentials it held — outlives the server it belonged to, and a
@@ -407,6 +416,7 @@ def list_server_profiles():
     users page must not fan out one request per site to draw its checkboxes.
     `cached_at` is returned so the UI can say how stale the list is.
     """
+    from core.location_pools import routes
     servers = get_all_vpn_servers()
     allowed = scoped_server_ids()
     if allowed is not None:
@@ -417,6 +427,8 @@ def list_server_profiles():
             "server_display_name": s["display_name"],
             "cached_at": s.get("profiles_cached_at"),
             "profiles": parse_server_profiles(s),
+            "routes": routes(s),
+            "routes_cached_at": s.get("routes_cached_at"),
         }
         for s in servers
     }})

@@ -49,6 +49,7 @@ def _remote_payload(row: dict) -> dict:
     except (ValueError, TypeError):
         profiles = []
     return {
+        "update_channel": "beta" if row.get("user_update_channel") == "beta" else "stable",
         "max_peers": row["max_peers"],
         "bandwidth_quota": row["bandwidth_quota"],
         "speed_download": row["speed_download"],

@@ -49,10 +49,10 @@ def _normalize(url: str) -> str:
     return (url or "").strip().rstrip("/").lower()
 
 
-def _verify_token(server: dict, token: str) -> str | None:
+def _verify_token(server: dict, token: str) -> dict | None:
     """Ask an instance whether this token is one of its own.
 
-    Returns the username it belongs to, or None. Uses the instance's
+    Returns the bound remote identity, or None. Uses the instance's
     management URL (ADM's own path to the box) with the *client's* bearer
     token — the same Flask app answers both, so no new endpoint is needed
     and the check lands on the only party that can actually make it.
@@ -64,6 +64,7 @@ def _verify_token(server: dict, token: str) -> str | None:
             headers={"Authorization": f"Bearer {token}"},
             timeout=VERIFY_TIMEOUT,
             verify=VERIFY_TLS,
+            allow_redirects=False,
         )
     except requests.RequestException as e:
         log.warning(f"[SYNC] Cannot reach {server['name']} to verify a token: {e}")
@@ -75,9 +76,12 @@ def _verify_token(server: dict, token: str) -> str | None:
         payload = resp.json()
     except ValueError:
         return None
-    if not payload.get("ok"):
+    if not isinstance(payload, dict) or not payload.get("ok"):
         return None
-    return (payload.get("data") or {}).get("username")
+    identity = payload.get("data")
+    if not isinstance(identity, dict) or type(identity.get("id")) is not int or identity["id"] <= 0 or not isinstance(identity.get("username"), str):
+        return None
+    return identity
 
 
 def _mint_token(server: dict, remote_user_id: int) -> str | None:
@@ -85,7 +89,8 @@ def _mint_token(server: dict, remote_user_id: int) -> str | None:
     url = f"{server['url'].rstrip('/')}/api/vpn/users/{remote_user_id}/token"
     try:
         resp = requests.post(
-            url, headers=auth_headers(server), timeout=MINT_TIMEOUT, verify=VERIFY_TLS
+            url, headers=auth_headers(server), timeout=MINT_TIMEOUT, verify=VERIFY_TLS,
+            allow_redirects=False,
         )
     except requests.RequestException as e:
         log.warning(f"[SYNC] Cannot reach {server['name']} to mint a token: {e}")
@@ -125,7 +130,9 @@ def sync():
         return jsonify({"ok": False, "error": "Too many attempts. Try again later.",
                         "retry_after": lockout}), 429
 
-    body = request.get_json(silent=True) or {}
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict) or not isinstance(body.get("public_url"), str) or not isinstance(body.get("token"), str) or not isinstance(body.get("known", []), list) or any(not isinstance(u, str) for u in body.get("known", [])):
+        return jsonify({"ok": False, "error": "Invalid sync request"}), 400
     public_url = _normalize(body.get("public_url"))
     token = (body.get("token") or "").strip()
     known = {_normalize(u) for u in (body.get("known") or []) if u}
@@ -143,23 +150,27 @@ def sync():
         log.info(f"[SYNC] Unknown origin '{public_url}' from {ip}")
         return jsonify({"ok": False, "error": "Unknown server"}), 404
 
-    username = _verify_token(origin, token)
-    if not username:
+    identity = _verify_token(origin, token)
+    if not identity:
         record_login_failure(ip)
         log.warning(f"[SYNC] {origin['name']} rejected the token from {ip}")
         return jsonify({"ok": False, "error": "Invalid or expired token"}), 401
 
+    username = identity["username"]
     user = get_vpn_user_by_username(username)
-    if not user or not user["enabled"]:
+    if not user or not user["enabled"] or user.get("deletion_pending"):
         log.warning(f"[SYNC] '{username}' is unknown or disabled in ADM")
         return jsonify({"ok": False, "error": "Account not available"}), 403
 
+    accesses = get_user_access(user["id"])
+    if not any(a["vpn_server_id"] == origin["id"] and a["enabled"] == 1 and a["sync_status"] == "synced" and type(a.get("remote_user_id")) is int and a["remote_user_id"] == identity["id"] for a in accesses):
+        return jsonify({"ok": False, "error": "Origin identity is not authorized"}), 403
     clear_login_failures(ip)
 
     by_id = {s["id"]: s for s in servers}
     result = []
-    for access in get_user_access(user["id"]):
-        if not access["enabled"]:
+    for access in accesses:
+        if not access["enabled"] or access["sync_status"] != "synced":
             continue
         server = by_id.get(access["vpn_server_id"])
         if not server:
@@ -201,8 +212,15 @@ def sync():
     if revoked:
         log.info(f"[SYNC] '{username}' lost access to {len(revoked)} server(s)")
 
-    return jsonify({"ok": True, "data": {
+    from core.location_pools import authorized_catalog
+    from core.pool_db import transaction
+    with transaction() as conn:
+        pool_catalog = authorized_catalog(conn, user["id"])
+    response = jsonify({"ok": True, "data": {
         "user": {"username": user["username"]},
         "servers": result,
         "revoked": revoked,
+        "pool_catalog": pool_catalog,
     }})
+    response.headers["Cache-Control"] = "no-store"
+    return response

@@ -38,6 +38,34 @@ What you lose while ADM is down is the ability to *change* things — create a u
 
 ## Who owns what
 
+### Client update channel
+
+ADM manages `update_channel` on the central `vpn_users` identity, not on a
+per-site assignment. Existing and new identities default to `stable`; an
+administrator can select `stable` or `beta` in the create/edit user dialog.
+The existing central-identity role and site-scope guards apply. Users cannot
+change this policy. It is independent of the per-site `allow_smart_test` grant:
+beta does not grant Smart Test and Smart Test does not select beta.
+
+Admin create/update APIs accept only those exact JSON strings. Responses and
+site pushes normalize missing or malformed stored policy to `stable`. Every
+site create/update payload includes top-level `update_channel`, read from the
+central identity. Changes queue all active assignments for immediate sync and
+scheduler retry; queued revocations remain deletions. Offline sites retain
+their previous replica until synchronization succeeds.
+
+Imports never replace central channel policy with site values; newly imported
+identities start on `stable`. A differing or absent site channel remains pending
+for an authoritative push. Password reconciliation still handles passwords only.
+
+The authenticated site client contract is `GET /api/vpn/self/me` with the channel
+at **`data.update_channel`** (not `data.user.update_channel`). Clients consume the
+site replica, not ADM directly, and should fall back to `stable` for an absent or
+unsupported channel. This contract does not itself implement a client updater.
+
+Deploy compatible site support before relying on the channel; re-sync identities
+if an older site previously ignored the field. No deployment is implied here.
+
 Both sides legitimately write, so the boundary is explicit:
 
 | ADM owns | The user owns |

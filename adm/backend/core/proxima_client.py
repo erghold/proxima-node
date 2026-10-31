@@ -6,10 +6,13 @@ in `vpn_servers.api_token_enc`.
 """
 
 import base64
+import ipaddress
 import json
 import logging
 import threading
 import time
+import uuid
+from urllib.parse import urlsplit, urlunsplit
 
 import requests
 
@@ -121,9 +124,58 @@ def auth_headers(server: dict) -> dict:
     return {"Authorization": f"Bearer {token}"} if token else {}
 
 
+def _pool_management_url(server: dict) -> str:
+    """Select once from this registered site's configuration, never after a failure."""
+    def parse(value):
+        if (not isinstance(value, str) or not value or any(ord(c) <= 32 for c in value)
+                or any(c in value for c in ("\\", "?", "#"))):
+            raise ValueError("Untrusted credential transport")
+        parsed = urlsplit(value)
+        if (not parsed.hostname or parsed.username is not None or parsed.password is not None
+                or parsed.scheme not in ("http", "https")):
+            raise ValueError("Untrusted credential transport")
+        _ = parsed.port  # Reject malformed/out-of-range ports before sending credentials.
+        return parsed
+
+    parsed = parse(server.get("url"))
+    try:
+        loopback = ipaddress.ip_address(parsed.hostname).is_loopback
+    except ValueError:
+        loopback = parsed.hostname == "localhost"
+    if parsed.scheme == "http" and not loopback:
+        parsed = parse(server.get("public_url"))
+        if parsed.scheme != "https":
+            raise ValueError("Untrusted credential transport")
+    if parsed.hostname == "localhost":
+        port = f":{parsed.port}" if parsed.port is not None else ""
+        parsed = parsed._replace(netloc=f"127.0.0.1{port}")
+    return urlunsplit(parsed).rstrip("/")
+
+
 def request(server: dict, method: str, path: str, body: dict | None = None,
-            timeout: int | tuple[int, int] = DEFAULT_TIMEOUT) -> requests.Response:
+            timeout: int | tuple[int, int] = DEFAULT_TIMEOUT, *,
+            credential_bootstrap: bool = False, management_write: bool = False) -> requests.Response:
     """Forward a request to a Proxima instance. Returns the raw response."""
+    if credential_bootstrap or management_write:
+        # Only the new pool flows select this stricter registered transport.
+        attachment_id = path.removeprefix("/api/vpn/pool-attachments/")
+        valid_operation = (credential_bootstrap and not management_write and method == "POST" and path == "/api/vpn/auth/login") or (
+            management_write and not credential_bootstrap and method == "PUT" and path.startswith("/api/vpn/pool-attachments/")
+            and str(uuid.UUID(attachment_id)) == attachment_id)
+        if not valid_operation:
+            raise ValueError("Untrusted credential transport")
+        url = f"{_pool_management_url(server)}{path}"
+        # Loopback includes already-established management tunnels; never create one.
+        # Login needs no admin token, and a redirect must never replay the password.
+        if credential_bootstrap:
+            return requests.post(url, json=body, headers={}, timeout=timeout,
+                                 verify=True, allow_redirects=False)
+        headers = auth_headers(server)
+        if not headers:
+            raise ValueError("Missing management credential")
+        return requests.put(url, json=body, headers=headers, timeout=timeout,
+                            verify=True, allow_redirects=False)
+
     url = f"{server['url'].rstrip('/')}{path}"
     headers = auth_headers(server)
 
